@@ -15,11 +15,13 @@
 # limitations under the License.
 
 """
-OpenFlow 1.4 definitions.
+OpenFlow 1.5 definitions.
 """
 
 from ryu.lib import type_desc
 from ryu.ofproto import oxm_fields
+# TODO: oxs_fields
+# from ryu.ofproto import oxs_fields
 
 from struct import calcsize
 
@@ -28,22 +30,21 @@ from struct import calcsize
 # Port numbering. Ports are numbered starting from 1.
 OFPP_MAX = 0xffffff00           # Maximum number of physical and logical
                                 # switch ports.
+OFPP_UNSET = 0xfffffff7         # Output port not set in action-set.
+                                # used only in OXM_OF_ACTSET_OUTPUT.
 OFPP_IN_PORT = 0xfffffff8       # Send the packet out the input port.  This
                                 # reserved port must be explicitly used in
                                 # order to send back out of the input port.
 OFPP_TABLE = 0xfffffff9         # Submit the packet to the first flow table
                                 # NB: This destination port can only be used
                                 # in packet-out messages.
-OFPP_NORMAL = 0xfffffffa        # Process with normal L2/L3 switching.
-OFPP_FLOOD = 0xfffffffb         # All physical ports in VLAN, except input
-                                # port and those blocked or link down.
-OFPP_ALL = 0xfffffffc           # All physical ports except input port.
+OFPP_NORMAL = 0xfffffffa        # Forward using non-OpenFlow pipeline.
+OFPP_FLOOD = 0xfffffffb         # Flood using non-OpenFlow pipeline.
+OFPP_ALL = 0xfffffffc           # All standard ports except input port.
 OFPP_CONTROLLER = 0xfffffffd    # Send to controller.
 OFPP_LOCAL = 0xfffffffe         # Local openflow "port".
-OFPP_ANY = 0xffffffff           # Wildcard port used only for flow mod
-                                # (delete) and flow stats requests. Selects
-                                # all flows regardless of output port
-                                # (including flows with no output port).
+OFPP_ANY = 0xffffffff           # Special value used in some requests when
+                                # no port is specified (i.e. wildcarded).
 
 
 # enum ofp_type
@@ -91,9 +92,10 @@ OFPT_TABLE_STATUS = 31          # Async message
 # Request forwarding by the switch.
 OFPT_REQUESTFORWARD = 32        # Async message
 # Bundle operations (multiple messages as a single operation).
-OFPT_BUNDLE_CONTROL = 33
-OFPT_BUNDLE_ADD_MESSAGE = 34
-
+OFPT_BUNDLE_CONTROL = 33        # Controller/switch message
+OFPT_BUNDLE_ADD_MESSAGE = 34    # Controller/switch message
+# Controller Status async message.
+OFPT_CONTROLLER_STATUS = 35     # Async message
 
 _OFP_HEADER_PACK_STR = 'BBHI'
 OFP_HEADER_PACK_STR = '!' + _OFP_HEADER_PACK_STR
@@ -109,6 +111,7 @@ OFP_HELLO_ELEM_HEADER_SIZE = 4
 assert (calcsize(OFP_HELLO_ELEM_HEADER_PACK_STR) == OFP_HELLO_ELEM_HEADER_SIZE)
 
 # enum ofp_hello_elem_type
+
 OFPHET_VERSIONBITMAP = 1
 
 # struct ofp_hello_elem_versionbitmap
@@ -187,6 +190,8 @@ OFPC_GROUP_STATS = 1 << 3   # Group statistics.
 OFPC_IP_REASM = 1 << 5      # Can reassemble IP fragments.
 OFPC_QUEUE_STATS = 1 << 6   # Queue statistics.
 OFPC_PORT_BLOCKED = 1 << 8  # Switch will block looping ports.
+OFPC_BUNDLES = 1 << 9       # Switch supports bundles.
+OFPC_FLOW_MONITORING = 1 << 10  # Switch supports flow monitoring.
 
 # enum ofp_port_config
 OFPPC_PORT_DOWN = 1 << 0        # Port is administratively down.
@@ -220,6 +225,9 @@ OFPPF_PAUSE_ASYM = 1 << 15  # Asymmetric pause.
 # enum ofp_port_desc_prop_type
 OFPPDPT_ETHERNET = 0            # Ethernet property.
 OFPPDPT_OPTICAL = 1             # Optical property.
+OFPPDPT_PIPELINE_INPUT = 2      # Ingress pipeline fields.
+OFPPDPT_PIPELINE_OUTPUT = 3     # Egress pipeline fields.
+OFPPDPT_RECIRCULATE = 4         # Recirculation property.
 OFPPDPT_EXPERIMENTER = 0xFFFF   # Experimenter property.
 
 # struct ofp_port_desc_prop_ethernet
@@ -239,6 +247,18 @@ OFP_PORT_DESC_PROP_OPTICAL_PACK_STR = '!HH4xIIIIIIIHH'
 OFP_PORT_DESC_PROP_OPTICAL_SIZE = 40
 assert (calcsize(OFP_PORT_DESC_PROP_OPTICAL_PACK_STR) ==
         OFP_PORT_DESC_PROP_OPTICAL_SIZE)
+
+# struct ofp_port_desc_prop_oxm
+OFP_PORT_DESC_PROP_OXM_PACK_STR = '!HH'
+OFP_PORT_DESC_PROP_OXM_SIZE = 4
+assert (calcsize(OFP_PORT_DESC_PROP_OXM_PACK_STR) ==
+        OFP_PORT_DESC_PROP_OXM_SIZE)
+
+# struct ofp_port_desc_prop_recirculate
+OFP_PORT_DESC_PROP_RECIRCULATE_PACK_STR = '!HH'
+OFP_PORT_DESC_PROP_RECIRCULATE_SIZE = 4
+assert (calcsize(OFP_PORT_DESC_PROP_RECIRCULATE_PACK_STR) ==
+        OFP_PORT_DESC_PROP_RECIRCULATE_SIZE)
 
 # struct ofp_port_desc_prop_experimenter
 OFP_PORT_DESC_PROP_EXPERIMENTER_PACK_STR = '!HHII'
@@ -302,6 +322,23 @@ OFP_PORT_MOD_SIZE = 32
 assert (calcsize(OFP_PORT_MOD_PACK_STR) + OFP_HEADER_SIZE ==
         OFP_PORT_MOD_SIZE)
 
+# enum ofp_header_type_namespaces
+OFPHTN_ONF = 0             # ONF namespace.
+OFPHTN_ETHERTYPE = 1       # ns_type is an Ethertype.
+OFPHTN_IP_PROTO = 2        # ns_type is a IP protocol number.
+OFPHTN_UDP_TCP_PORT = 3    # ns_type is a TCP or UDP port.
+OFPHTN_IPV4_OPTION = 4     # ns_type is an IPv4 option number.
+
+# enum ofp_header_type_onf
+OFPHTO_ETHERNET = 0        # Ethernet (DIX or IEEE 802.3) - default.
+OFPHTO_NO_HEADER = 1       # No header, ex. circuit switch.
+OFPHTO_OXM_EXPERIMENTER = 0xFFFF  # Use Experimenter OXM.
+
+# struct ofp_header_type
+OFP_HEADER_TYPE_PACK_STR = '!HH'
+OFP_HEADER_TYPE_SIZE = 4
+assert (calcsize(OFP_HEADER_TYPE_PACK_STR) ==
+        OFP_HEADER_TYPE_SIZE)
 
 # enum ofp_match_type
 OFPMT_STANDARD = 0  # Deprecated
@@ -317,6 +354,7 @@ assert calcsize(OFP_MATCH_PACK_STR) == OFP_MATCH_SIZE
 OFPXMC_NXM_0 = 0x0000           # Backward compatibility with NXM
 OFPXMC_NXM_1 = 0x0001           # Backward compatibility with NXM
 OFPXMC_OPENFLOW_BASIC = 0x8000  # Basic class for OpenFlow
+OFPXMC_PACKET_REGS = 0x8001     # Packet registers (pipeline fields).
 OFPXMC_EXPERIMENTER = 0xFFFF    # Experimenter class
 
 # enum ofp_vlan_id
@@ -389,12 +427,31 @@ oxm_types = [
     oxm_fields.OpenFlowBasic('tunnel_id', 38, type_desc.Int8),
     oxm_fields.OpenFlowBasic('ipv6_exthdr', 39, type_desc.Int2),
     oxm_fields.OpenFlowBasic('pbb_uca', 41, type_desc.Int1),
+    oxm_fields.OpenFlowBasic('tcp_flags', 42, type_desc.Int2),
+    oxm_fields.OpenFlowBasic('actset_output', 43, type_desc.Int4),
+    oxm_fields.OpenFlowBasic('packet_type', 44, type_desc.Int4),
     oxm_fields.NiciraExtended1('tun_ipv4_src', 31, type_desc.IPv4Addr),
     oxm_fields.NiciraExtended1('tun_ipv4_dst', 32, type_desc.IPv4Addr),
 ]
 
 oxm_fields.generate(__name__)
 
+# struct ofp_stats
+_OFP_STATS_PACK_STR = 'HH4x'
+OFP_STATS_PACK_STR = '!' + _OFP_STATS_PACK_STR
+OFP_STATS_SIZE = 8
+assert calcsize(OFP_STATS_PACK_STR) == OFP_STATS_SIZE
+
+# enum ofp_oxs_class
+OFPXSC_OPENFLOW_BASIC = 0x8002  # Basic stats class for OpenFlow
+OFPXSC_EXPERIMENTER = 0xFFFF    # Experimenter class
+
+# enum oxs_ofb_stat_fields
+OFPXST_OFB_DURATION = 0         # Time flow entry has been alive.
+OFPXST_OFB_IDLE_TIME = 1        # Time flow entry has been idle.
+OFPXST_OFB_FLOW_COUNT = 3       # Number of aggregated flow entries.
+OFPXST_OFB_PACKET_COUNT = 4     # Number of packets in flow entry.
+OFPXST_OFB_BYTE_COUNT = 5       # Number of bytes in flow entry.
 
 # enum ofp_action_type
 OFPAT_OUTPUT = 0            # Output to switch port.
@@ -415,6 +472,8 @@ OFPAT_DEC_NW_TTL = 24       # Decrement IP TTL.
 OFPAT_SET_FIELD = 25        # Set a header field using OXM TLV format.
 OFPAT_PUSH_PBB = 26         # Push a new PBB service tag (I-TAG)
 OFPAT_POP_PBB = 27          # Pop the outer PBB service tag (I-TAG)
+OFPAT_COPY_FIELD = 28       # Copy value between header and register.
+OFPAT_METER = 29            # Apply meter (rate limiter)
 OFPAT_EXPERIMENTER = 0xffff
 
 
@@ -475,6 +534,16 @@ OFP_ACTION_SET_FIELD_PACK_STR = '!HH4x'
 OFP_ACTION_SET_FIELD_SIZE = 8
 assert calcsize(OFP_ACTION_SET_FIELD_PACK_STR) == OFP_ACTION_SET_FIELD_SIZE
 
+# struct ofp_action_copy_field
+OFP_ACTION_COPY_FIELD_PACK_STR = '!HHHHH2x'
+OFP_ACTION_COPY_FIELD_SIZE = 12
+assert calcsize(OFP_ACTION_COPY_FIELD_PACK_STR) == OFP_ACTION_COPY_FIELD_SIZE
+
+# struct ofp_action_meter
+OFP_ACTION_METER_PACK_STR = '!HHI'
+OFP_ACTION_METER_SIZE = 8
+assert calcsize(OFP_ACTION_METER_PACK_STR) == OFP_ACTION_METER_SIZE
+
 # struct ofp_action_experimenter_header
 OFP_ACTION_EXPERIMENTER_HEADER_PACK_STR = '!HHI'
 OFP_ACTION_EXPERIMENTER_HEADER_SIZE = 8
@@ -490,7 +559,8 @@ OFPIT_WRITE_ACTIONS = 3         # Write the action(s) onto the datapath
 OFPIT_APPLY_ACTIONS = 4         # Applies the action(s) immediately
 OFPIT_CLEAR_ACTIONS = 5         # Clears all actions from the datapath action
                                 # set
-OFPIT_METER = 6                 # Apply meter (rate limiter)
+OFPIT_DEPRECATED = 6            # Deprecated (was apply meter)
+OFPIT_STAT_TRIGGER = 7          # Statistics triggers
 OFPIT_EXPERIMENTER = 0xFFFF     # Experimenter instruction
 
 # struct ofp_instruction_goto_table
@@ -511,10 +581,19 @@ OFP_INSTRUCTION_ACTIONS_SIZE = 8
 assert (calcsize(OFP_INSTRUCTION_ACTIONS_PACK_STR) ==
         OFP_INSTRUCTION_ACTIONS_SIZE)
 
-# struct ofp_instruction_meter
-OFP_INSTRUCTION_METER_PACK_STR = '!HHI'
-OFP_INSTRUCTION_METER_SIZE = 8
-assert calcsize(OFP_INSTRUCTION_METER_PACK_STR) == OFP_INSTRUCTION_METER_SIZE
+# enum ofp_stat_trigger_flags
+OFPSTF_PERIODIC = 1 << 0        # Trigger for all multiples of thresholds.
+OFPSTF_ONLY_FIRST = 1 << 1      # Trigger on only first reach threshold.
+
+# struct ofp_instruction_stat_trigger
+_OFP_INSTRUCTION_STAT_TRIGGER_PACK_STR0 = 'HHI'
+OFP_INSTRUCTION_STAT_TRIGGER_PACK_STR = (
+    '!' + _OFP_INSTRUCTION_STAT_TRIGGER_PACK_STR0 + _OFP_STATS_PACK_STR)
+OFP_INSTRUCTION_STAT_TRIGGER_PACK_STR0 = (
+    '!' + _OFP_INSTRUCTION_STAT_TRIGGER_PACK_STR0)
+OFP_INSTRUCTION_STAT_TRIGGER_PACK_SIZE = 16
+assert (calcsize(OFP_INSTRUCTION_STAT_TRIGGER_PACK_STR) ==
+        OFP_INSTRUCTION_STAT_TRIGGER_PACK_SIZE)
 
 # struct ofp_instruction_experimenter_header
 OFP_INSTRUCTION_EXPERIMENTER_HEADER_PACK_STR = '!HHI'
@@ -555,23 +634,85 @@ assert (calcsize(OFP_FLOW_MOD_PACK_STR) + OFP_HEADER_SIZE ==
 # enum ofp_group
 OFPG_MAX = 0xffffff00   # Last usable group number.
 OFPG_ALL = 0xfffffffc   # Represents all groups for group delete commands.
-OFPG_ANY = 0xffffffff   # Wildcard group used only for flow stats requests.
-                        # Selects all flows regardless of group
-                        # (including flows with no group).
+OFPG_ANY = 0xffffffff   # Special wildcard: no group specified.
 
 # enum ofp_group_mod_command
 OFPGC_ADD = 0       # New group.
 OFPGC_MODIFY = 1    # Modify all matching groups.
 OFPGC_DELETE = 2    # Delete all matching groups.
+OFPGC_INSERT_BUCKET = 3     # Insert action buckets to the already available
+                            # list of action buckets in a matching group
+# OFPGC_??? = 4             # Reserved for future use.
+OFPGC_REMOVE_BUCKET = 5     # Remove all action buckets or any specific action
+                            # bucket from matching group
+
+# enum ofp_group_bucket_prop_type
+OFPGBPT_WEIGHT = 0      # Select groups only.
+OFPGBPT_WATCH_PORT = 1  # Fast failover groups only.
+OFPGBPT_WATCH_GROU = 2  # Fast failover groups only.
+OFPGBPT_EXPERIMENTER = 0xFFFF  # Experimenter defined.
+
+# struct ofp_group_bucket_prop_header
+OFP_GROUP_BUCKET_PROP_HEADER_PACK_STR = '!HH'
+OFP_GROUP_BUCKET_PROP_HEADER_SIZE = 4
+assert (calcsize(OFP_GROUP_BUCKET_PROP_HEADER_PACK_STR) ==
+        OFP_GROUP_BUCKET_PROP_HEADER_SIZE)
+
+# struct ofp_group_bucket_prop_weight
+OFP_GROUP_BUCKET_PROP_WEIGHT_PACK_STR = '!HHH2x'
+OFP_GROUP_BUCKET_PROP_WEIGHT_SIZE = 8
+assert (calcsize(OFP_GROUP_BUCKET_PROP_WEIGHT_PACK_STR) ==
+        OFP_GROUP_BUCKET_PROP_WEIGHT_SIZE)
+
+# struct ofp_group_bucket_prop_watch
+OFP_GROUP_BUCKET_PROP_WATCH_PACK_STR = '!HHI'
+OFP_GROUP_BUCKET_PROP_WATCH_SIZE = 8
+assert (calcsize(OFP_GROUP_BUCKET_PROP_WATCH_PACK_STR) ==
+        OFP_GROUP_BUCKET_PROP_WATCH_SIZE)
+
+# struct ofp_group_bucket_prop_experimenter
+OFP_GROUP_BUCKET_PROP_EXPERIMENTER_PACK_STR = '!HHII'
+OFP_GROUP_BUCKET_PROP_EXPERIMENTER_SIZE = 12
+assert (calcsize(OFP_GROUP_BUCKET_PROP_EXPERIMENTER_PACK_STR) ==
+        OFP_GROUP_BUCKET_PROP_EXPERIMENTER_SIZE)
 
 # struct ofp_bucket
-OFP_BUCKET_PACK_STR = '!HHII4x'
-OFP_BUCKET_SIZE = 16
+OFP_BUCKET_PACK_STR = '!HHI'
+OFP_BUCKET_SIZE = 8
 assert calcsize(OFP_BUCKET_PACK_STR) == OFP_BUCKET_SIZE
 
+# enum ofp_group_bucket
+OFPG_BUCKET_MAX = 0xffffff00    # Last usable bucket ID.
+OFPG_BUCKET_FIRST = 0xfffffffd  # First bucket ID in the list of action
+                                #  buckets of a group. This is applicable
+                                #  for OFPGC_INSERT_BUCKET and
+                                #  OFPGC_REMOVE_BUCKET commands.
+OFPG_BUCKET_LAST = 0xfffffffe   # Last bucket ID in the list of action
+                                # buckets of a group. This is applicable
+                                # for OFPGC_INSERT_BUCKET and
+                                # OFPGC_REMOVE_BUCKET commands.
+OFPG_BUCKET_ALL = 0xffffffff    # All action buckets in a group,
+                                # This is applicable for
+                                # only OFPGC_REMOVE_BUCKET command.
+
+# enum ofp_group_prop_type
+OFPGPT_EXPERIMENTER = 0xFFFF  # Experimenter defined.
+
+# struct ofp_group_prop_header
+OFP_GROUP_PROP_HEADER_PACK_STR = '!HH'
+OFP_GROUP_PROP_HEADER_SIZE = 4
+assert (calcsize(OFP_GROUP_PROP_HEADER_PACK_STR) ==
+        OFP_GROUP_PROP_HEADER_SIZE)
+
+# struct ofp_group_prop_experimenter
+OFP_GROUP_PROP_EXPERIMENTER_PACK_STR = '!HHII'
+OFP_GROUP_PROP_EXPERIMENTER_SIZE = 12
+assert (calcsize(OFP_GROUP_PROP_EXPERIMENTER_PACK_STR) ==
+        OFP_GROUP_PROP_EXPERIMENTER_SIZE)
+
 # struct ofp_group_mod
-OFP_GROUP_MOD_PACK_STR = '!HBxI'
-OFP_GROUP_MOD_SIZE = 16
+OFP_GROUP_MOD_PACK_STR = '!HBxIH2xI'
+OFP_GROUP_MOD_SIZE = 24
 assert (calcsize(OFP_GROUP_MOD_PACK_STR) + OFP_HEADER_SIZE ==
         OFP_GROUP_MOD_SIZE)
 
@@ -585,9 +726,9 @@ OFPGT_FF = 3        # Fast failover group.
 OFP_NO_BUFFER = 0xffffffff  # Special buffer-id to indicate 'no buffer'
 
 # struct ofp_packet_out
-OFP_PACKET_OUT_PACK_STR = '!IIH6x'
+OFP_PACKET_OUT_PACK_STR = '!IH2x'
 OFP_PACKET_OUT_SIZE = 24
-assert (calcsize(OFP_PACKET_OUT_PACK_STR) + OFP_HEADER_SIZE ==
+assert (calcsize(OFP_PACKET_OUT_PACK_STR) + OFP_MATCH_SIZE + OFP_HEADER_SIZE ==
         OFP_PACKET_OUT_SIZE)
 
 # enum ofp_packet_in_reason
@@ -620,11 +761,11 @@ assert (calcsize(OFP_PORT_STATUS_PACK_STR) + OFP_HEADER_SIZE ==
         OFP_PORT_STATUS_SIZE)
 
 # struct ofp_flow_removed
-_OFP_FLOW_REMOVED_PACK_STR0 = 'QHBBIIHHQQ'
+_OFP_FLOW_REMOVED_PACK_STR0 = 'BBHHHQ'
 OFP_FLOW_REMOVED_PACK_STR = '!' + _OFP_FLOW_REMOVED_PACK_STR0 + \
                             _OFP_MATCH_PACK_STR
 OFP_FLOW_REMOVED_PACK_STR0 = '!' + _OFP_FLOW_REMOVED_PACK_STR0
-OFP_FLOW_REMOVED_SIZE = 56
+OFP_FLOW_REMOVED_SIZE = 32
 assert (calcsize(OFP_FLOW_REMOVED_PACK_STR) + OFP_HEADER_SIZE ==
         OFP_FLOW_REMOVED_SIZE)
 
@@ -725,16 +866,23 @@ OFPBRC_BUFFER_UNKNOWN = 8               # Specified buffer does not exist.
 OFPBRC_BAD_TABLE_ID = 9                 # Specified table-id invalid or does
                                         # not exist.
 OFPBRC_IS_SLAVE = 10                    # Denied because controller is slave.
-OFPBRC_BAD_PORT = 11                    # Invalid port.
+OFPBRC_BAD_PORT = 11                    # Invalid port or missing port.
 OFPBRC_BAD_PACKET = 12                  # Invalid packet in packet-out
 OFPBRC_MULTIPART_BUFFER_OVERFLOW = 13   # ofp_multipart_request
                                         # overflowed the assigned buffer.
 OFPBRC_MULTIPART_REQUEST_TIMEOUT = 14   # Timeout during multipart request.
 OFPBRC_MULTIPART_REPLY_TIMEOUT = 15     # Timeout during multipart reply.
+OFPBRC_MULTIPART_BAD_SCHED = 16         # Switch received a
+                                        # OFPMP_BUNDLE_FEATURES request and
+                                        # failed to update the scheduling
+                                        # tolerance.
+OFPBRC_PIPELINE_FIELDS_ONLY = 17        # Match fields must include only
+                                        # pipeline fields.
+OFPBRC_UNKNOWN = 18                     # Unspecified error.
 
 
 # enum ofp_bad_action_code
-OFPBAC_BAD_TYPE = 0             # Unknown action type.
+OFPBAC_BAD_TYPE = 0             # Unknown or unsupported action type.
 OFPBAC_BAD_LEN = 1              # Length problem in actions.
 OFPBAC_BAD_EXPERIMENTER = 2     # Unknown experimenter id specified.
 OFPBAC_BAD_EXP_TYPE = 3         # Unknown action type for experimenter id.
@@ -753,6 +901,7 @@ OFPBAC_BAD_TAG = 12             # Actions uses an unsupported tag/encap.
 OFPBAC_BAD_SET_TYPE = 13        # Unsupported type in SET_FIELD action.
 OFPBAC_BAD_SET_LEN = 14         # Length problem in SET_FIELD action.
 OFPBAC_BAD_SET_ARGUMENT = 15    # Bad arguement in SET_FIELD action.
+OFPBAC_BAD_SET_MASK = 16        # Bad mask in SET_FIELD action.
 
 # enum ofp_bad_instruction_code
 OFPBIC_UNKNOWN_INST = 0         # Unknown instruction.
@@ -783,8 +932,7 @@ OFPBMC_BAD_WILDCARDS = 5        # Unsupported combination of fields
                                 # masked or omitted in the match.
 OFPBMC_BAD_FIELD = 6            # Unsupported field type in the match.
 OFPBMC_BAD_VALUE = 7            # Unsupported value in a match field.
-OFPBMC_BAD_MASK = 8             # Unsupported mask specified in the
-                                # match.
+OFPBMC_BAD_MASK = 8             # Unsupported mask specified in the match.
 OFPBMC_BAD_PREREQ = 9           # A prerequisite was not met.
 OFPBMC_DUP_FIELD = 10           # A field type was duplicated.
 OFPBMC_EPERM = 11               # Permissions error.
@@ -802,6 +950,7 @@ OFPFMFC_BAD_COMMAND = 6     # Unsupported or unknown command.
 OFPFMFC_BAD_FLAGS = 7       # Unsupported or unknown flags.
 OFPFMFC_CANT_SYNC = 8       # Problem in table synchronisation.
 OFPFMFC_BAD_PRIORITY = 9    # Unsupported priority value.
+OFPFMFC_IS_SYNC = 10        # Synchronised flow entry is read only.
 
 # enum ofp_group_mod_failed_code
 OFPGMFC_GROUP_EXISTS = 0            # Group not added because a group ADD
@@ -828,6 +977,10 @@ OFPGMFC_BAD_COMMAND = 11            # Unsupported or unknown command.
 OFPGMFC_BAD_BUCKET = 12             # Error in bucket.
 OFPGMFC_BAD_WATCH = 13              # Error in watch port/group.
 OFPGMFC_EPERM = 14                  # Permissions error.
+OFPGMFC_UNKNOWN_BUCKET = 15         # Invalid bucket identifier used in
+                                    # INSERT BUCKET or REMOVE BUCKET command.
+OFPGMFC_BUCKET_EXISTS = 16          # Can't insert bucket because a bucket
+                                    # already exist with that bucket-id.
 
 # enum ofp_port_mod_failed_code
 OFPPMFC_BAD_PORT = 0        # Specified port does not exist.
@@ -849,22 +1002,26 @@ OFPQOFC_EPERM = 2           # Permissions error.
 
 # enum ofp_switch_config_failed_code
 OFPSCFC_BAD_FLAGS = 0       # Specified flags is invalid.
-OFPSCFC_BAD_LEN = 1         # Specified len is invalid.
+OFPSCFC_BAD_LEN = 1         # Specified miss send len is invalid.
 OFPSCFC_EPERM = 2           # Permissions error.
+
 
 # enum ofp_role_request_failed_code
 OFPRRFC_STALE = 0           # Stale Message: old generation_id.
 OFPRRFC_UNSUP = 1           # Controller role change unsupported.
 OFPRRFC_BAD_ROLE = 2        # Invalid role.
+OFPRRFC_ID_UNSUP = 3        # Switch doesn't support changing ID.
+OFPRRFC_ID_IN_USE = 4       # Requested ID is in use.
 
 # enum ofp_meter_mod_failed_code
 OFPMMFC_UNKNOWN = 0         # Unspecified error.
 OFPMMFC_METER_EXISTS = 1    # Meter not added because a Meter ADD
                             # attempted to replace an existing Meter.
 OFPMMFC_INVALID_METER = 2   # Meter not added because Meter specified
-                            # is invalid.
+                            # is invalid, or invalid meter in meter action.
 OFPMMFC_UNKNOWN_METER = 3   # Meter not modified because a Meter MODIFY
-                            # attempted to modify a non-existent Meter.
+                            # attempted to modify a non-existent Meter,
+                            # or bad meter in meter action.
 OFPMMFC_BAD_COMMAND = 4     # Unsupported or unknown command.
 OFPMMFC_BAD_FLAGS = 5       # Flag configuration unsupported.
 OFPMMFC_BAD_RATE = 6        # Rate unsupported.
@@ -879,9 +1036,14 @@ OFPMMFC_OUT_OF_BANDS = 11   # The maximum number of properties for a
 OFPTFFC_BAD_TABLE = 0       # Specified table does not exist.
 OFPTFFC_BAD_METADATA = 1    # Invalid metadata mask.
 OFPTFFC_EPERM = 5           # Permissions error.
+OFPTFFC_BAD_CAP = 6         # Invalid capability field.
+OFPTFFC_BAD_MAX_ENT = 7     # Invalid max_entries field.
+OFPTFFC_BAD_FEATURES = 8    # Invalid features field.
+OFPTFFC_BAD_COMMAND = 9     # Invalid command.
+OFPTFFC_TOO_MANY = 10       # Can't handle this many flow tables.
 
 # enum ofp_bad_property_code
-OFPBPC_BAD_TYPE = 0             # Unknown property type.
+OFPBPC_BAD_TYPE = 0             # Unknown or unsupported property type.
 OFPBPC_BAD_LEN = 1              # Length problem in property.
 OFPBPC_BAD_VALUE = 2            # Unsupported property value.
 OFPBPC_TOO_MANY = 3             # Can't handle this many properties.
@@ -905,7 +1067,7 @@ OFPMOFC_INVALID_MONITOR = 2     # Monitor not added because Monitor
                                 # specified is invalid.
 OFPMOFC_UNKNOWN_MONITOR = 3     # Monitor not modified because a Monitor
                                 # MODIFY attempted to modify a non-existent
-                                #  Monitor.
+                                # Monitor.
 OFPMOFC_BAD_COMMAND = 4         # Unsupported or unknown command.
 OFPMOFC_BAD_FLAGS = 5           # Flag configuration unsupported.
 OFPMOFC_BAD_TABLE_ID = 6        # Specified table does not exist.
@@ -929,6 +1091,10 @@ OFPBFC_MSG_TOO_MANY = 12        # Can't handle this many messages in bundle.
 OFPBFC_MSG_FAILED = 13          # One message in bundle failed.
 OFPBFC_TIMEOUT = 14             # Bundle is taking too long.
 OFPBFC_BUNDLE_IN_PROGRESS = 15  # Bundle is locking the resource.
+OFPBFC_SCHED_NOT_SUPPORTED = 16  # Scheduled commit was received and
+                                # scheduling is not supported.
+OFPBFC_SCHED_FUTURE = 17        # Scheduled commit time exceeds upper bound.
+OFPBFC_SCHED_PAST = 18          # Scheduled commit time exceeds lower bound.
 
 # struct ofp_error_msg
 OFP_ERROR_MSG_PACK_STR = '!HH'
@@ -950,22 +1116,25 @@ assert (calcsize(OFP_EXPERIMENTER_HEADER_PACK_STR) + OFP_HEADER_SIZE
 
 # enum ofp_multipart_type
 OFPMP_DESC = 0
-OFPMP_FLOW = 1
-OFPMP_AGGREGATE = 2
-OFPMP_TABLE = 3
+OFPMP_FLOW_DESC = 1
+OFPMP_AGGREGATE_STATS = 2
+OFPMP_TABLE_STATS = 3
 OFPMP_PORT_STATS = 4
 OFPMP_QUEUE_STATS = 5
-OFPMP_GROUP = 6
+OFPMP_GROUP_STATS = 6
 OFPMP_GROUP_DESC = 7
 OFPMP_GROUP_FEATURES = 8
-OFPMP_METER = 9
-OFPMP_METER_CONFIG = 10
+OFPMP_METER_STATS = 9
+OFPMP_METER_DESC = 10
 OFPMP_METER_FEATURES = 11
 OFPMP_TABLE_FEATURES = 12
 OFPMP_PORT_DESC = 13
 OFPMP_TABLE_DESC = 14
 OFPMP_QUEUE_DESC = 15
 OFPMP_FLOW_MONITOR = 16
+OFPMP_FLOW_STATS = 17
+OFPMP_CONTROLLER_STATUS = 18
+OFPMP_BUNDLE_FEATURES = 19
 OFPMP_EXPERIMENTER = 0xffff
 
 # struct ofp_multipart_request
@@ -1008,14 +1177,27 @@ OFP_FLOW_STATS_REQUEST_SIZE = 40
 assert (calcsize(OFP_FLOW_STATS_REQUEST_PACK_STR) ==
         OFP_FLOW_STATS_REQUEST_SIZE)
 
+# struct ofp_flow_desc
+_OFP_FLOW_DESC_0_PACK_STR = 'H2xBBHHHHHQ'
+OFP_FLOW_DESC_0_PACK_STR = '!' + _OFP_FLOW_DESC_0_PACK_STR
+OFP_FLOW_DESC_0_SIZE = 24
+assert calcsize(OFP_FLOW_DESC_0_PACK_STR) == OFP_FLOW_DESC_0_SIZE
+OFP_FLOW_DESC_PACK_STR = OFP_FLOW_DESC_0_PACK_STR + _OFP_MATCH_PACK_STR
+OFP_FLOW_DESC_SIZE = 32
+assert calcsize(OFP_FLOW_DESC_PACK_STR) == OFP_FLOW_DESC_SIZE
+
+# enum ofp_flow_stats_reason
+OFPFSR_STATS_REQUEST = 0   # Reply to a OFPMP_FLOW_STATS request.
+OFPFSR_STAT_TRIGGER = 1    # Status generated by OFPIT_STAT_TRIGGER.
+
 # struct ofp_flow_stats
-_OFP_FLOW_STATS_0_PACK_STR = 'HBxIIHHHHH2xQQQ'
+_OFP_FLOW_STATS_0_PACK_STR = 'H2xBBH'
 OFP_FLOW_STATS_0_PACK_STR = '!' + _OFP_FLOW_STATS_0_PACK_STR
-OFP_FLOW_STATS_0_SIZE = 48
+OFP_FLOW_STATS_0_SIZE = 8
 assert calcsize(OFP_FLOW_STATS_0_PACK_STR) == OFP_FLOW_STATS_0_SIZE
 OFP_FLOW_STATS_PACK_STR = (OFP_FLOW_STATS_0_PACK_STR +
                            _OFP_MATCH_PACK_STR)
-OFP_FLOW_STATS_SIZE = 56
+OFP_FLOW_STATS_SIZE = 16
 assert calcsize(OFP_FLOW_STATS_PACK_STR) == OFP_FLOW_STATS_SIZE
 
 # struct ofp_aggregate_stats_request
@@ -1025,8 +1207,8 @@ assert (calcsize(OFP_AGGREGATE_STATS_REQUEST_PACK_STR) ==
         OFP_AGGREGATE_STATS_REQUEST_SIZE)
 
 # struct ofp_aggregate_stats_reply
-OFP_AGGREGATE_STATS_REPLY_PACK_STR = '!QQI4x'
-OFP_AGGREGATE_STATS_REPLY_SIZE = 24
+OFP_AGGREGATE_STATS_REPLY_PACK_STR = OFP_STATS_PACK_STR
+OFP_AGGREGATE_STATS_REPLY_SIZE = OFP_STATS_SIZE
 assert (calcsize(OFP_AGGREGATE_STATS_REPLY_PACK_STR) ==
         OFP_AGGREGATE_STATS_REPLY_SIZE)
 
@@ -1047,6 +1229,11 @@ OFPTFPT_WRITE_SETFIELD_MISS = 13
 OFPTFPT_APPLY_SETFIELD = 14
 OFPTFPT_APPLY_SETFIELD_MISS = 15
 OFPTFPT_TABLE_SYNC_FROM = 16
+OFPTFPT_WRITE_COPYFIELD = 18       # Write Copy-Field property.
+OFPTFPT_WRITE_COPYFIELD_MISS = 19  # Write Copy-Field for table-miss.
+OFPTFPT_APPLY_COPYFIELD = 20       # Apply Copy-Field property.
+OFPTFPT_APPLY_COPYFIELD_MISS = 21  # Apply Copy-Field for table-miss.
+OFPTFPT_PACKET_TYPES = 22          # Packet types property.
 OFPTFPT_EXPERIMENTER = 0xFFFE
 OFPTFPT_EXPERIMENTER_MISS = 0xFFFF
 
@@ -1073,17 +1260,33 @@ OFP_TABLE_FEATURE_PROP_OXM_SIZE = 4
 assert (calcsize(OFP_TABLE_FEATURE_PROP_OXM_PACK_STR) ==
         OFP_TABLE_FEATURE_PROP_OXM_SIZE)
 
+# struct ofp_table_feature_prop_oxm_values
+OFP_TABLE_FEATURE_PROP_OXM_VALUES_PACK_STR = '!HH'
+OFP_TABLE_FEATURE_PROP_OXM_VALUES_SIZE = 4
+assert (calcsize(OFP_TABLE_FEATURE_PROP_OXM_VALUES_PACK_STR) ==
+        OFP_TABLE_FEATURE_PROP_OXM_VALUES_SIZE)
+
 # struct ofp_table_feature_prop_experimenter
 OFP_TABLE_FEATURE_PROP_EXPERIMENTER_PACK_STR = '!HHII'
 OFP_TABLE_FEATURE_PROP_EXPERIMENTER_SIZE = 12
 assert (calcsize(OFP_TABLE_FEATURE_PROP_EXPERIMENTER_PACK_STR) ==
         OFP_TABLE_FEATURE_PROP_EXPERIMENTER_SIZE)
 
+# enum ofp_table_feature_flag
+OFPTFF_INGRESS_TABLE = 1 << 0  # Can be configured as ingress table.
+OFPTFF_EGRESS_TABLE = 1 << 1   # Can be configured as egress table.
+OFPTFF_FIRST_EGRESS = 1 << 4   # Is the first egress table.
+
+# enum ofp_table_features_command
+OFPTFC_REPLACE = 0  # Replace full pipeline.
+OFPTFC_MODIFY = 1   # Modify flow tables capabilities.
+OFPTFC_ENABLE = 2   # Enable flow tables in the pipeline.
+OFPTFC_DISABLE = 3  # Disable flow tables in pipeline.
 
 # struct ofp_table_features
 OFP_MAX_TABLE_NAME_LEN = 32
 OFP_MAX_TABLE_NAME_LEN_STR = str(OFP_MAX_TABLE_NAME_LEN)
-OFP_TABLE_FEATURES_PACK_STR = '!HB5x' + OFP_MAX_TABLE_NAME_LEN_STR + \
+OFP_TABLE_FEATURES_PACK_STR = '!HBBI' + OFP_MAX_TABLE_NAME_LEN_STR + \
                               's' + 'QQII'
 OFP_TABLE_FEATURES_SIZE = 64
 assert (calcsize(OFP_TABLE_FEATURES_PACK_STR) ==
@@ -1100,11 +1303,11 @@ OFP_TABLE_DESC_PACK_STR = '!' + _OFP_TABLE_DESC_PACK_STR
 OFP_TABLE_DESC_SIZE = 8
 assert calcsize(OFP_TABLE_DESC_PACK_STR) == OFP_TABLE_DESC_SIZE
 
-# struct ofp_port_stats_request
-OFP_PORT_STATS_REQUEST_PACK_STR = '!I4x'
-OFP_PORT_STATS_REQUEST_SIZE = 8
-assert (calcsize(OFP_PORT_STATS_REQUEST_PACK_STR) ==
-        OFP_PORT_STATS_REQUEST_SIZE)
+# struct ofp_port_multipart_request
+OFP_PORT_MULTIPART_REQUEST_PACK_STR = '!I4x'
+OFP_PORT_MULTIPART_REQUEST_SIZE = 8
+assert (calcsize(OFP_PORT_MULTIPART_REQUEST_PACK_STR) ==
+        OFP_PORT_MULTIPART_REQUEST_SIZE)
 
 # enum ofp_port_stats_prop_type
 OFPPSPT_ETHERNET = 0            # Ethernet property.
@@ -1142,11 +1345,11 @@ OFP_PORT_STATS_PACK_STR = '!H2xIIIQQQQQQQQ'
 OFP_PORT_STATS_SIZE = 80
 assert calcsize(OFP_PORT_STATS_PACK_STR) == OFP_PORT_STATS_SIZE
 
-# struct ofp_group_stats_request
-OFP_GROUP_STATS_REQUEST_PACK_STR = '!I4x'
-OFP_GROUP_STATS_REQUEST_SIZE = 8
-assert (calcsize(OFP_GROUP_STATS_REQUEST_PACK_STR) ==
-        OFP_GROUP_STATS_REQUEST_SIZE)
+# struct ofp_group_multipart_request
+OFP_GROUP_MULTIPART_REQUEST_PACK_STR = '!I4x'
+OFP_GROUP_MULTIPART_REQUEST_SIZE = 8
+assert (calcsize(OFP_GROUP_MULTIPART_REQUEST_PACK_STR) ==
+        OFP_GROUP_MULTIPART_REQUEST_SIZE)
 
 # struct ofp_bucket_counter
 OFP_BUCKET_COUNTER_PACK_STR = '!QQ'
@@ -1164,8 +1367,8 @@ OFP_GROUP_STATS_SIZE = 40
 assert calcsize(OFP_GROUP_STATS_PACK_STR) == OFP_GROUP_STATS_SIZE
 
 # struct ofp_group_desc
-OFP_GROUP_DESC_PACK_STR = '!HBxI'
-OFP_GROUP_DESC_SIZE = 8
+OFP_GROUP_DESC_PACK_STR = '!HBxIH6x'
+OFP_GROUP_DESC_SIZE = 16
 assert calcsize(OFP_GROUP_DESC_PACK_STR) == OFP_GROUP_DESC_SIZE
 
 # enum ofp_group_capabilities
@@ -1196,14 +1399,19 @@ OFP_METER_BAND_STATS_SIZE = 16
 assert (calcsize(OFP_METER_BAND_STATS_PACK_STR) ==
         OFP_METER_BAND_STATS_SIZE)
 
-# struct ofp_meter_config
-OFP_METER_CONFIG_PACK_STR = '!HHI'
-OFP_METER_CONFIG_SIZE = 8
-assert calcsize(OFP_METER_CONFIG_PACK_STR) == OFP_METER_CONFIG_SIZE
+# struct ofp_meter_desc
+OFP_METER_DESC_PACK_STR = '!HHI'
+OFP_METER_DESC_SIZE = 8
+assert calcsize(OFP_METER_DESC_PACK_STR) == OFP_METER_DESC_SIZE
+
+# enum ofp_meter_feature_flags
+OFPMFF_ACTION_SET = 1 << 0  # Support meter action in action set.
+OFPMFF_ANY_POSITION = 1 << 1  # Support any position in action list.
+OFPMFF_MULTI_LIST = 1 << 2  # Support multiple actions in action list.
 
 # struct ofp_meter_features
-OFP_METER_FEATURES_PACK_STR = '!IIIBB2x'
-OFP_METER_FEATURES_SIZE = 16
+OFP_METER_FEATURES_PACK_STR = '!IIIBB2xI4x'
+OFP_METER_FEATURES_SIZE = 24
 assert (calcsize(OFP_METER_FEATURES_PACK_STR) ==
         OFP_METER_FEATURES_SIZE)
 
@@ -1239,22 +1447,16 @@ OFP_QUEUE_DESC_PROP_EXPERIMENTER_SIZE = 12
 assert (calcsize(OFP_QUEUE_DESC_PROP_EXPERIMENTER_PACK_STR) ==
         OFP_QUEUE_DESC_PROP_EXPERIMENTER_SIZE)
 
-# struct ofp_queue_desc_request
-OFP_QUEUE_DESC_REQUEST_PACK_STR = '!II'
-OFP_QUEUE_DESC_REQUEST_SIZE = 8
-assert (calcsize(OFP_QUEUE_DESC_REQUEST_PACK_STR) ==
-        OFP_QUEUE_DESC_REQUEST_SIZE)
+# struct ofp_queue_multipart_request
+OFP_QUEUE_MULTIPART_REQUEST_PACK_STR = '!II'
+OFP_QUEUE_MULTIPART_REQUEST_SIZE = 8
+assert (calcsize(OFP_QUEUE_MULTIPART_REQUEST_PACK_STR) ==
+        OFP_QUEUE_MULTIPART_REQUEST_SIZE)
 
 # struct ofp_queue_desc
 OFP_QUEUE_DESC_PACK_STR = '!IIH6x'
 OFP_QUEUE_DESC_SIZE = 16
 assert calcsize(OFP_QUEUE_DESC_PACK_STR) == OFP_QUEUE_DESC_SIZE
-
-# struct ofp_queue_stats_request
-OFP_QUEUE_STATS_REQUEST_PACK_STR = '!II'
-OFP_QUEUE_STATS_REQUEST_SIZE = 8
-assert (calcsize(OFP_QUEUE_STATS_REQUEST_PACK_STR) ==
-        OFP_QUEUE_STATS_REQUEST_SIZE)
 
 # enum ofp_queue_stats_prop_type
 OFPQSPT_EXPERIMENTER = 0xffff   # Experimenter defined property.
@@ -1337,6 +1539,96 @@ OFP_FLOW_UPDATE_PAUSED_SIZE = 8
 assert (calcsize(OFP_FLOW_UPDATE_PAUSED_PACK_STR) ==
         OFP_FLOW_UPDATE_PAUSED_SIZE)
 
+# enum ofp_controller_status_prop_type
+OFPCSPT_URI = 0                # Connection URI property.
+OFPCSPT_EXPERIMENTER = 0xFFFF  # Experimenter property.
+
+# struct ofp_controller_status_prop_header
+_OFP_CONTROLLER_STATUS_PROP_HEADER_PACK_STR = 'HH'
+OFP_CONTROLLER_STATUS_PROP_HEADER_PACK_STR = (
+    '!' + _OFP_CONTROLLER_STATUS_PROP_HEADER_PACK_STR)
+OFP_CONTROLLER_STATUS_PROP_HEADER_SIZE = 4
+assert (calcsize(OFP_CONTROLLER_STATUS_PROP_HEADER_PACK_STR) ==
+        OFP_CONTROLLER_STATUS_PROP_HEADER_SIZE)
+
+# struct ofp_controller_status_prop_uri
+OFP_CONTROLLER_STATUS_PROP_URI_PACK_STR = '!HH'
+OFP_CONTROLLER_STATUS_PROP_URI_SIZE = 4
+assert (calcsize(OFP_CONTROLLER_STATUS_PROP_URI_PACK_STR) ==
+        OFP_CONTROLLER_STATUS_PROP_URI_SIZE)
+
+# struct ofp_controller_status_prop_experimenter
+OFP_CONTROLLER_STATUS_PROP_EXPERIMENTER_PACK_STR = '!HHII'
+OFP_CONTROLLER_STATUS_PROP_EXPERIMENTER_SIZE = 12
+assert (calcsize(OFP_CONTROLLER_STATUS_PROP_EXPERIMENTER_PACK_STR) ==
+        OFP_CONTROLLER_STATUS_PROP_EXPERIMENTER_SIZE)
+
+# enum ofp_controller_status_reason
+OFPCSR_REQUEST = 0             # Controller requested status.
+OFPCSR_CHANNEL_STATUS = 1      # Oper status of channel changed.
+OFPCSR_ROLE = 2                # Controller role changed.
+OFPCSR_CONTROLLER_ADDED = 3    # New controller added.
+OFPCSR_CONTROLLER_REMOVED = 4  # Controller removed from config.
+OFPCSR_SHORT_ID = 5            # Controller ID changed.
+OFPCSR_EXPERIMENTER = 6        # Experimenter data changed.
+
+# struct ofp_controller_status
+OFP_CONTROLLER_STATUS_PACK_STR = '!HHIBB6x'
+OFP_CONTROLLER_STATUS_SIZE = 16
+assert (calcsize(OFP_CONTROLLER_STATUS_PACK_STR) ==
+        OFP_CONTROLLER_STATUS_SIZE)
+
+# struct ofp_controller_status_header
+OFP_CONTROLLER_STATUS_HEADER_PACK_STR = OFP_CONTROLLER_STATUS_PACK_STR
+OFP_CONTROLLER_STATUS_HEADER_SIZE = OFP_CONTROLLER_STATUS_SIZE + OFP_HEADER_SIZE
+
+# enum ofp_control_channel_status
+OFPCT_STATUS_UP = 0    # Control channel is operational.
+OFPCT_STATUS_DOWN = 1  # Control channel is not operational.
+
+# struct ofp_bundle_features_prop_header
+OFP_BUNDLE_FEATURES_PROP_HEADER_PACK_STR = '!HH'
+OFP_BUNDLE_FEATURES_PROP_HEADER_SIZE = 4
+assert (calcsize(OFP_BUNDLE_FEATURES_PROP_HEADER_PACK_STR) ==
+        OFP_BUNDLE_FEATURES_PROP_HEADER_SIZE)
+
+# struct ofp_bundle_features_request
+OFP_BUNDLE_FEATURES_REQUEST_PACK_STR = '!I4x'
+OFP_BUNDLE_FEATURES_REQUEST_SIZE = 8
+assert (calcsize(OFP_BUNDLE_FEATURES_REQUEST_PACK_STR) ==
+        OFP_BUNDLE_FEATURES_REQUEST_SIZE)
+
+# enum ofp_bundle_features_prop_type
+OFPTMPBF_TIME_CAPABILITY = 0x1  # Time feature property.
+OFPTMPBF_EXPERIMENTER = 0xFFFF  # Experimenter property.
+
+# struct ofp_time
+_OFP_TIME_PACK_STR = 'QI4x'
+OFP_TIME_PACK_STR = '!' + _OFP_TIME_PACK_STR
+OFP_TIME_SIZE = 16
+assert calcsize(OFP_TIME_PACK_STR) == OFP_TIME_SIZE
+
+# struct ofp_bundle_features_prop_time
+OFP_BUNDLE_FEATURES_PROP_TIME_PACK_STR = ('!HH4x' +
+                                          _OFP_TIME_PACK_STR +
+                                          _OFP_TIME_PACK_STR +
+                                          _OFP_TIME_PACK_STR +
+                                          _OFP_TIME_PACK_STR)
+OFP_BUNDLE_FEATURES_PROP_TIME_SIZE = 72
+assert (calcsize(OFP_BUNDLE_FEATURES_PROP_TIME_PACK_STR) ==
+        OFP_BUNDLE_FEATURES_PROP_TIME_SIZE)
+
+# enum ofp_bundle_feature_flags
+OFPBF_TIMESTAMP = 1 << 0        # Request includes a timestamp.
+OFPBF_TIME_SET_SCHED = 1 << 1   # Request includes the sched_max_future and
+                                # sched_max_past parameters.
+
+# struct ofp_bundle_features
+OFP_BUNDLE_FEATURES_PACK_STR = '!H6x'
+OFP_BUNDLE_FEATURES_SIZE = 8
+assert (calcsize(OFP_BUNDLE_FEATURES_PACK_STR) ==
+        OFP_BUNDLE_FEATURES_SIZE)
+
 # struct ofp_experimenter_multipart_header
 OFP_EXPERIMENTER_MULTIPART_HEADER_PACK_STR = '!II'
 OFP_EXPERIMENTER_MULTIPART_HEADER_SIZE = 8
@@ -1361,14 +1653,25 @@ OFPCR_ROLE_EQUAL = 1        # Default role, full access.
 OFPCR_ROLE_MASTER = 2       # Full access, at most one master.
 OFPCR_ROLE_SLAVE = 3        # Read-only access.
 
+# If the switch has not requested an identifier, the short_id should be set to
+# OFPCID_UNDEFINED.
+OFPCID_UNDEFINED = 0
+
 # struct ofp_role_request
-OFP_ROLE_REQUEST_PACK_STR = '!I4xQ'
+OFP_ROLE_REQUEST_PACK_STR = '!IH2xQ'
 OFP_ROLE_REQUEST_SIZE = 24
 assert (calcsize(OFP_ROLE_REQUEST_PACK_STR) + OFP_HEADER_SIZE ==
         OFP_ROLE_REQUEST_SIZE)
 
 # enum ofp_role_prop_type
 OFPRPT_EXPERIMENTER = 0xFFFF    # Experimenter property.
+
+# struct ofp_role_prop_header
+_OFP_ROLE_PROP_HEADER_PACK_STR = 'HH'
+OFP_ROLE_PROP_HEADER_PACK_STR = '!' + _OFP_ROLE_PROP_HEADER_PACK_STR
+OFP_ROLE_PROP_HEADER_SIZE = 4
+assert (calcsize(OFP_ROLE_PROP_HEADER_PACK_STR) ==
+        OFP_ROLE_PROP_HEADER_SIZE)
 
 # struct ofp_role_prop_experimenter
 OFP_ROLE_PROP_EXPERIMENTER_PACK_STR = '!HHII'
@@ -1400,8 +1703,12 @@ OFPACPT_TABLE_STATUS_SLAVE = 8          # Table status mask for slave.
 OFPACPT_TABLE_STATUS_MASTER = 9         # Table status mask for master.
 OFPACPT_REQUESTFORWARD_SLAVE = 10       # RequestForward mask for slave.
 OFPACPT_REQUESTFORWARD_MASTER = 11      # RequestForward mask for master.
-OFPTFPT_EXPERIMENTER_SLAVE = 0xFFFE     # Experimenter for slave.
-OFPTFPT_EXPERIMENTER_MASTER = 0xFFFF    # Experimenter for master.
+OFPACPT_FLOW_STATS_SLAVE = 12           # Flow stats mask for slave.
+OFPACPT_FLOW_STATS_MASTER = 13          # Flow stats mask for master.
+OFPACPT_CONT_STATUS_SLAVE = 14          # Controller status mask for slave.
+OFPACPT_CONT_STATUS_MASTER = 15         # Controller status mask for master.
+OFPACPT_EXPERIMENTER_SLAVE = 0xFFFE     # Experimenter for slave.
+OFPACPT_EXPERIMENTER_MASTER = 0xFFFF    # Experimenter for master.
 
 # struct ofp_async_config_prop_reasons
 OFP_ASYNC_CONFIG_PROP_REASONS_PACK_STR = '!HHI'
@@ -1434,6 +1741,7 @@ OFPRFR_GROUP_MOD = 0    # Forward group mod requests.
 OFPRFR_METER_MOD = 1    # Forward meter mod requests.
 
 # enum ofp_bundle_prop_type
+OFPBPT_TIME = 1                 # Time property.
 OFPBPT_EXPERIMENTER = 0xFFFF    # Experimenter property.
 
 # struct ofp_bundle_prop_experimenter
@@ -1441,6 +1749,17 @@ OFP_BUNDLE_PROP_EXPERIMENTER_PACK_STR = '!HHII'
 OFP_BUNDLE_PROP_EXPERIMENTER_SIZE = 12
 assert (calcsize(OFP_BUNDLE_PROP_EXPERIMENTER_PACK_STR) ==
         OFP_BUNDLE_PROP_EXPERIMENTER_SIZE)
+
+# struct ofp_bundle_prop_time
+OFP_BUNDLE_PROP_TIME_PACK_STR0 = '!HH4x'
+OFP_BUNDLE_PROP_TIME_PACK_STR0_SIZE = 8
+assert (calcsize(OFP_BUNDLE_PROP_TIME_PACK_STR0) ==
+        OFP_BUNDLE_PROP_TIME_PACK_STR0_SIZE)
+OFP_BUNDLE_PROP_TIME_PACK_STR = (OFP_BUNDLE_PROP_TIME_PACK_STR0 +
+                                 _OFP_TIME_PACK_STR)
+OFP_BUNDLE_PROP_TIME_PACK_STR_SIZE = 24
+assert (calcsize(OFP_BUNDLE_PROP_TIME_PACK_STR) ==
+        OFP_BUNDLE_PROP_TIME_PACK_STR_SIZE)
 
 # enum ofp_bundle_ctrl_type
 OFPBCT_OPEN_REQUEST = 0
@@ -1455,6 +1774,7 @@ OFPBCT_DISCARD_REPLY = 7
 # enum ofp_bundle_flags
 OFPBF_ATOMIC = 1 << 0   # Execute atomically.
 OFPBF_ORDERED = 1 << 1  # Execute in specified order.
+OFPBF_TIME = 1 << 2     # Execute in specified time.
 
 # struct ofp_bundle_ctrl_msg
 OFP_BUNDLE_CTRL_MSG_PACK_STR = '!IHH'
@@ -1472,7 +1792,7 @@ assert (calcsize(OFP_BUNDLE_ADD_MSG_PACK_STR) + OFP_HEADER_SIZE ==
         OFP_BUNDLE_ADD_MSG_SIZE)
 
 # define constants
-OFP_VERSION = 0x05
+OFP_VERSION = 0x06
 OFP_TCP_PORT = 6653
 OFP_SSL_PORT = 6653
 MAX_XID = 0xffffffff

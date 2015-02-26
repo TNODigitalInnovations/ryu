@@ -15,7 +15,7 @@
 # limitations under the License.
 
 """
-Decoder/Encoder implementations of OpenFlow 1.4.
+Decoder/Encoder implementations of OpenFlow 1.5.
 """
 
 import struct
@@ -29,7 +29,7 @@ from ofproto_parser import StringifyMixin, MsgBase, MsgInMsgBase, msg_str_attr
 from . import ether
 from . import ofproto_parser
 from . import ofproto_common
-from . import ofproto_v1_4 as ofproto
+from . import ofproto_v1_5 as ofproto
 
 _MSG_PARSERS = {}
 
@@ -2877,7 +2877,7 @@ class OFPGroupStats(StringifyMixin):
         return group_stats
 
 
-@_set_stats_type(ofproto.OFPMP_GROUP, OFPGroupStats)
+@_set_stats_type(ofproto.OFPMP_GROUP_STATS, OFPGroupStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REQUEST)
 class OFPGroupStatsRequest(OFPMultipartRequest):
     """
@@ -2915,7 +2915,7 @@ class OFPGroupStatsRequest(OFPMultipartRequest):
 
 
 @OFPMultipartReply.register_stats_type()
-@_set_stats_type(ofproto.OFPMP_GROUP, OFPGroupStats)
+@_set_stats_type(ofproto.OFPMP_GROUP_STATS, OFPGroupStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REPLY)
 class OFPGroupStatsReply(OFPMultipartReply):
     """
@@ -3157,7 +3157,7 @@ class OFPMeterStats(StringifyMixin):
         return meter_stats
 
 
-@_set_stats_type(ofproto.OFPMP_METER, OFPMeterStats)
+@_set_stats_type(ofproto.OFPMP_METER_STATS, OFPMeterStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REQUEST)
 class OFPMeterStatsRequest(OFPMultipartRequest):
     """
@@ -3195,7 +3195,7 @@ class OFPMeterStatsRequest(OFPMultipartRequest):
 
 
 @OFPMultipartReply.register_stats_type()
-@_set_stats_type(ofproto.OFPMP_METER, OFPMeterStats)
+@_set_stats_type(ofproto.OFPMP_METER_STATS, OFPMeterStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REPLY)
 class OFPMeterStatsReply(OFPMultipartReply):
     """
@@ -3361,7 +3361,7 @@ class OFPMeterConfigStats(StringifyMixin):
         return meter_config
 
 
-@_set_stats_type(ofproto.OFPMP_METER_CONFIG, OFPMeterConfigStats)
+@_set_stats_type(ofproto.OFPMP_METER_DESC, OFPMeterConfigStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REQUEST)
 class OFPMeterConfigStatsRequest(OFPMultipartRequest):
     """
@@ -3400,7 +3400,7 @@ class OFPMeterConfigStatsRequest(OFPMultipartRequest):
 
 
 @OFPMultipartReply.register_stats_type()
-@_set_stats_type(ofproto.OFPMP_METER_CONFIG, OFPMeterConfigStats)
+@_set_stats_type(ofproto.OFPMP_METER_DESC, OFPMeterConfigStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REPLY)
 class OFPMeterConfigStatsReply(OFPMultipartReply):
     """
@@ -3920,7 +3920,7 @@ class OFPFlowStatsRequestBase(OFPMultipartRequest):
         self.match.serialize(self.buf, offset)
 
 
-@_set_stats_type(ofproto.OFPMP_FLOW, OFPFlowStats)
+@_set_stats_type(ofproto.OFPMP_FLOW_STATS, OFPFlowStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REQUEST)
 class OFPFlowStatsRequest(OFPFlowStatsRequestBase):
     """
@@ -3969,7 +3969,7 @@ class OFPFlowStatsRequest(OFPFlowStatsRequestBase):
 
 
 @OFPMultipartReply.register_stats_type()
-@_set_stats_type(ofproto.OFPMP_FLOW, OFPFlowStats)
+@_set_stats_type(ofproto.OFPMP_FLOW_STATS, OFPFlowStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REPLY)
 class OFPFlowStatsReply(OFPMultipartReply):
     """
@@ -4020,7 +4020,7 @@ class OFPAggregateStats(ofproto_parser.namedtuple('OFPAggregateStats', (
         return stats
 
 
-@_set_stats_type(ofproto.OFPMP_AGGREGATE, OFPAggregateStats)
+@_set_stats_type(ofproto.OFPMP_AGGREGATE_STATS, OFPAggregateStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REQUEST)
 class OFPAggregateStatsRequest(OFPFlowStatsRequestBase):
     """
@@ -4071,7 +4071,7 @@ class OFPAggregateStatsRequest(OFPFlowStatsRequestBase):
 
 
 @OFPMultipartReply.register_stats_type(body_single_struct=True)
-@_set_stats_type(ofproto.OFPMP_AGGREGATE, OFPAggregateStats)
+@_set_stats_type(ofproto.OFPMP_AGGREGATE_STATS, OFPAggregateStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REPLY)
 class OFPAggregateStatsReply(OFPMultipartReply):
     """
@@ -4125,7 +4125,7 @@ class OFPTableStats(ofproto_parser.namedtuple('OFPTableStats', (
         return stats
 
 
-@_set_stats_type(ofproto.OFPMP_TABLE, OFPTableStats)
+@_set_stats_type(ofproto.OFPMP_TABLE_STATS, OFPTableStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REQUEST)
 class OFPTableStatsRequest(OFPMultipartRequest):
     """
@@ -4153,7 +4153,7 @@ class OFPTableStatsRequest(OFPMultipartRequest):
 
 
 @OFPMultipartReply.register_stats_type()
-@_set_stats_type(ofproto.OFPMP_TABLE, OFPTableStats)
+@_set_stats_type(ofproto.OFPMP_TABLE_STATS, OFPTableStats)
 @_set_msg_type(ofproto.OFPT_MULTIPART_REPLY)
 class OFPTableStatsReply(OFPMultipartReply):
     """
@@ -4949,37 +4949,6 @@ class OFPInstructionActions(OFPInstruction):
                       buf, offset, self.type, self.len)
 
 
-@OFPInstruction.register_instruction_type([ofproto.OFPIT_METER])
-class OFPInstructionMeter(OFPInstruction):
-    """
-    Meter instruction
-
-    This instruction applies the meter.
-
-    ================ ======================================================
-    Attribute        Description
-    ================ ======================================================
-    meter_id         Meter instance
-    ================ ======================================================
-    """
-    def __init__(self, meter_id=1, type_=None, len_=None):
-        super(OFPInstructionMeter, self).__init__()
-        self.type = ofproto.OFPIT_METER
-        self.len = ofproto.OFP_INSTRUCTION_METER_SIZE
-        self.meter_id = meter_id
-
-    @classmethod
-    def parser(cls, buf, offset):
-        (type_, len_, meter_id) = struct.unpack_from(
-            ofproto.OFP_INSTRUCTION_METER_PACK_STR,
-            buf, offset)
-        return cls(meter_id)
-
-    def serialize(self, buf, offset):
-        msg_pack_into(ofproto.OFP_INSTRUCTION_METER_PACK_STR,
-                      buf, offset, self.type, self.len, self.meter_id)
-
-
 class OFPActionHeader(StringifyMixin):
     def __init__(self, type_, len_):
         self.type = type_
@@ -5450,6 +5419,36 @@ class OFPActionPopPbb(OFPAction):
         return cls()
 
 
+@OFPAction.register_action_type(ofproto.OFPAT_METER,
+                                ofproto.OFP_ACTION_METER_SIZE)
+class OFPActionMeter(OFPAction):
+    """
+    Meter action
+
+    This action applies meter (rate limiter)
+
+    ================ ======================================================
+    Attribute        Description
+    ================ ======================================================
+    meter_id         Meter instance
+    ================ ======================================================
+    """
+    def __init__(self, meter_id,
+                 type_=None, len_=None):
+        super(OFPActionMeter, self).__init__()
+        self.meter_id = meter_id
+
+    @classmethod
+    def parser(cls, buf, offset):
+        type_, len_, meter_id = struct.unpack_from(
+            ofproto.OFP_ACTION_METER_PACK_STR, buf, offset)
+        return cls(meter_id)
+
+    def serialize(self, buf, offset):
+        msg_pack_into(ofproto.OFP_ACTION_METER_PACK_STR, buf,
+                      offset, self.type, self.len, self.meter_id)
+
+
 @OFPAction.register_action_type(
     ofproto.OFPAT_EXPERIMENTER,
     ofproto.OFP_ACTION_EXPERIMENTER_HEADER_SIZE)
@@ -5848,8 +5847,8 @@ class OFPAsyncConfigPropReasons(StringifyMixin):
         return buf
 
 
-@OFPAsyncConfigProp.register_type(ofproto.OFPTFPT_EXPERIMENTER_SLAVE)
-@OFPAsyncConfigProp.register_type(ofproto.OFPTFPT_EXPERIMENTER_MASTER)
+@OFPAsyncConfigProp.register_type(ofproto.OFPACPT_EXPERIMENTER_SLAVE)
+@OFPAsyncConfigProp.register_type(ofproto.OFPACPT_EXPERIMENTER_MASTER)
 class OFPAsyncConfigPropExperimenter(OFPPropCommonExperimenter4ByteData):
     pass
 

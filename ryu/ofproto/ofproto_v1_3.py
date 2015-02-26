@@ -1021,7 +1021,11 @@ OFPQOFC_EPERM = 2           # Permissions error.
 # enum ofp_switch_config_failed_code
 OFPSCFC_BAD_FLAGS = 0       # Specified flags is invalid.
 OFPSCFC_BAD_LEN = 1         # Specified len is invalid.
-OFPQCFC_EPERM = 2           # Permissions error.
+OFPQCFC_EPERM = 2           # Permissions error (depracated).
+                            # New or updated Ryu applications shall use
+                            # OFPSCFC_EPERM. The variable name is a typo of
+                            # in specifications before v1.3.1 (EXT-208).
+OFPSCFC_EPERM = 2           # Permissions error.
 
 # enum ofp_role_request_failed_code
 OFPRRFC_STALE = 0           # Stale Message: old generation_id.
@@ -1177,7 +1181,12 @@ oxm_types = [
     oxm_fields.OpenFlowBasic('pbb_isid', 37, type_desc.Int3),
     oxm_fields.OpenFlowBasic('tunnel_id', 38, type_desc.Int8),
     oxm_fields.OpenFlowBasic('ipv6_exthdr', 39, type_desc.Int2),
-    oxm_fields.ONFExperimenter('pbb_uca', 2560, type_desc.Int1),
+    oxm_fields.OldONFExperimenter('pbb_uca', 2560, type_desc.Int1),
+    # EXT-109 TCP flags match field Extension
+    oxm_fields.ONFExperimenter('tcp_flags', 42, type_desc.Int2),
+    # EXT-233 Output match Extension
+    # NOTE(yamamoto): The spec says uint64_t but I assume it's an error.
+    oxm_fields.ONFExperimenter('actset_output', 43, type_desc.Int4),
     oxm_fields.NiciraExtended1('tun_ipv4_src', 31, type_desc.IPv4Addr),
     oxm_fields.NiciraExtended1('tun_ipv4_dst', 32, type_desc.IPv4Addr),
     oxm_fields.OpenFlowBasic('any_match', 40, type_desc.Filter),

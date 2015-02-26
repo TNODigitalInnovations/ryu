@@ -29,6 +29,7 @@ from ryu.ofproto import ether
 from ryu.ofproto.ofproto_parser import MsgBase
 from ryu import utils
 from ryu.lib import addrconv
+from ryu.lib import pack_utils
 
 LOG = logging.getLogger('test_ofproto_v12')
 
@@ -742,7 +743,7 @@ class TestOFPErrorMsg(unittest.TestCase):
 
     def test_parser_p10_2(self):
         type_ = ofproto.OFPET_SWITCH_CONFIG_FAILED
-        code = ofproto.OFPQCFC_EPERM
+        code = ofproto.OFPSCFC_EPERM
         data = 'Error Message.'
         self._test_parser(type_, code, data)
 
@@ -1196,7 +1197,7 @@ class TestOFPErrorMsg(unittest.TestCase):
 
     def test_serialize_p10_2(self):
         self._test_serialize_p(ofproto.OFPET_SWITCH_CONFIG_FAILED,
-                               ofproto.OFPQCFC_EPERM)
+                               ofproto.OFPSCFC_EPERM)
 
     def test_serialize_p11_0(self):
         self._test_serialize_p(ofproto.OFPET_ROLE_REQUEST_FAILED,
@@ -6673,12 +6674,11 @@ class TestOFPMatch(unittest.TestCase):
 
     def test_parse_unknown_field(self):
         buf = bytearray()
-        ofproto_parser.msg_pack_into('!HH', buf, 0, ofproto.OFPMT_OXM,
-                                     4 + 6)
+        pack_utils.msg_pack_into('!HH', buf, 0, ofproto.OFPMT_OXM, 4 + 6)
         header = ofproto.oxm_tlv_header(36, 2)
-        ofproto_parser.msg_pack_into('!IH', buf, 4, header, 1)
+        pack_utils.msg_pack_into('!IH', buf, 4, header, 1)
         header = ofproto.OXM_OF_ETH_TYPE
-        ofproto_v1_2_parser.msg_pack_into('!IH', buf, 10, header, 1)
+        pack_utils.msg_pack_into('!IH', buf, 10, header, 1)
 
         match = OFPMatch()
         res = match.parser(str(buf), 0)

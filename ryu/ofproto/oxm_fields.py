@@ -24,7 +24,7 @@
 #   value and mask are on-wire bytes.
 #   mask is None if no mask.
 
-# There are three type of OXM/NXM headers.
+# There are two types of OXM/NXM headers.
 #
 # 32-bit OXM/NXM header
 # +-------------------------------+-------------+-+---------------+
@@ -37,29 +37,40 @@
 # +-------------------------------+-------------+-+---------------+
 # | experimenter ID                                               |
 # +---------------------------------------------------------------+
+
+# NOTE: EXT-256 had a variation of experimenter OXM header.
+# It has been rectified since then.  Currently this implementation
+# supports only the old version.
 #
-# ONF EXT-256 style experimenter OXM header
+# ONF EXT-256 (old, exp_type = 2560)
 # +-------------------------------+-------------+-+---------------+
 # | class (OFPXMC_EXPERIMENTER)   | ?????       |m| length        |
 # +-------------------------------+-------------+-+---------------+
 # | experimenter ID (ONF_EXPERIMENTER_ID)                         |
-# +-------------------------------+-------------------------------+
-# | exp_type                      |
-# +-------------------------------+
+# +-------------------------------+---------------+---------------+
+# | exp_type (PBB_UCA=2560)       | pbb_uca       |
+# +-------------------------------+---------------+
 #
-# Note: According to blp@nicira, EXT-256 will be rectified.
-# https://www.mail-archive.com/dev%40openvswitch.org/msg37644.html
+# ONF EXT-256 (new, oxm_field = 41)
+# +-------------------------------+-------------+-+---------------+
+# | class (OFPXMC_EXPERIMENTER)   | PBB_UCA=41  |m| length        |
+# +-------------------------------+-------------+-+---------------+
+# | experimenter ID (ONF_EXPERIMENTER_ID)                         |
+# +-------------------------------+---------------+---------------+
+# | reserved, should be zero      | pbb_uca       |
+# +-------------------------------+---------------+
 
 import itertools
 import struct
 import ofproto_common
-from ofproto_parser import msg_pack_into
+from ryu.lib.pack_utils import msg_pack_into
 from ryu.lib import type_desc
 
 
 OFPXMC_NXM_0 = 0  # Nicira Extended Match (NXM_OF_)
 OFPXMC_NXM_1 = 1  # Nicira Extended Match (NXM_NX_)
 OFPXMC_OPENFLOW_BASIC = 0x8000
+OFPXMC_PACKET_REGS = 0x8001
 OFPXMC_EXPERIMENTER = 0xffff
 
 
@@ -77,6 +88,10 @@ class OpenFlowBasic(_OxmClass):
     _class = OFPXMC_OPENFLOW_BASIC
 
 
+class PacketRegs(_OxmClass):
+    _class = OFPXMC_PACKET_REGS
+
+
 class _Experimenter(_OxmClass):
     _class = OFPXMC_EXPERIMENTER
 
@@ -88,8 +103,13 @@ class _Experimenter(_OxmClass):
 class ONFExperimenter(_Experimenter):
     experimenter_id = ofproto_common.ONF_EXPERIMENTER_ID
 
+
+class OldONFExperimenter(_Experimenter):
+    # This class is for the old version of EXT-256
+    experimenter_id = ofproto_common.ONF_EXPERIMENTER_ID
+
     def __init__(self, name, num, type_):
-        super(ONFExperimenter, self).__init__(name, 0, type_)
+        super(OldONFExperimenter, self).__init__(name, 0, type_)
         self.num = (self.experimenter_id, num)
         self.exp_type = num
 
@@ -254,7 +274,8 @@ def _parse_header_impl(mod, buf, offset):
                                         offset + hdr_len)
         exp_hdr_len = struct.calcsize(exp_hdr_pack_str)
         assert exp_hdr_len == 4
-        if exp_id == ofproto_common.ONF_EXPERIMENTER_ID:
+        oxm_field = oxm_type & 0x7f
+        if exp_id == ofproto_common.ONF_EXPERIMENTER_ID and oxm_field == 0:
             # XXX
             # This block implements EXT-256 style experimenter OXM.
             onf_exp_type_pack_str = '!H'
@@ -309,7 +330,7 @@ def _make_exp_hdr(mod, n):
     if isinstance(desc, _Experimenter):  # XXX
         (exp_id, exp_type) = n
         assert desc.experimenter_id == exp_id
-        if isinstance(desc, ONFExperimenter):  # XXX
+        if isinstance(desc, OldONFExperimenter):  # XXX
             # XXX
             # This block implements EXT-256 style experimenter OXM.
             exp_hdr_pack_str = '!IH'  # experimenter_id, exp_type
