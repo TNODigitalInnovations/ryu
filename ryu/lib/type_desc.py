@@ -65,6 +65,27 @@ class IPv6Addr(TypeDescr):
     to_user = addrconv.ipv6.bin_to_text
     from_user = addrconv.ipv6.text_to_bin
 
+class BPFProgram(object):
+    def __init__(self, instructions):
+        self.instructions = instructions
+
+import struct
+class Filter(TypeDescr):
+    size = 248
+
+    @staticmethod
+    def to_user(bin):
+        program = BPFProgram([])
+        for x in range(Filter.size/8):
+            program.instructions.append(struct.unpack_from('HBBI', bin, offset=x*8))
+        return program
+
+    @staticmethod
+    def from_user(i):
+        bin = ''.join([ struct.pack('HBBI', *v) for v in i.instructions ])
+        padding = chr(0) * (Filter.size-len(bin))
+        return bin + padding
+
 
 class UnknownType(TypeDescr):
     import base64
