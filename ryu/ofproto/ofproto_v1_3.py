@@ -1190,12 +1190,15 @@ oxm_types = [
     oxm_fields.NiciraExtended1('tun_ipv4_src', 31, type_desc.IPv4Addr),
     oxm_fields.NiciraExtended1('tun_ipv4_dst', 32, type_desc.IPv4Addr),
     oxm_fields.OpenFlowBasic('any_match', 40, type_desc.Filter),
+    oxm_fields.OpenFlowBasic('exec_bpf', 41, type_desc.Int4),
+
 
     # The following definition is merely for testing 64-bit experimenter OXMs.
     # Following Open vSwitch, we use dp_hash for this purpose.
     # Prefix the name with '_' to indicate this is not intended to be used
     # in wild.
     oxm_fields.NiciraExperimenter('_dp_hash', 0, type_desc.Int4),
+
 ]
 
 oxm_fields.generate(__name__)
