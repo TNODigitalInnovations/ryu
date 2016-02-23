@@ -1,0 +1,134 @@
+
+;Quick & Dirty NDN matching
+ldx     #0x04    		;Offset 4 for ofsoftswitch
+ldh     [x + 12]   		;Load ethertype
+jne     #0x800, drop  		;If other than v4 drop
+
+ldb	[x + 23]		;Load ip proto
+jne	#0x11, drop		;IF not UDP		
+
+;Statement below doesnt work :'( this is the lengthy work-around
+;ldxb	4 * ([x + 14] & 0xF)	;Load ip header length into X
+
+
+ldb	[x + 14]
+and	#0xF
+mul	#0x4
+add 	#0xE			;Add the length of the ethernet Header
+tax
+
+ldx	#38
+
+ldh	[x + 2]			;Load UDP dest port		 	
+jne	#0xdc2b, drop		;if not 56363
+
+
+;ldxb	x + 8			;Advance 8 bytes to end of UDP
+txa
+add	#8
+tax
+
+jmp     pass	
+
+
+ldb	[x + 0]			;Load ndn Type
+jne	#0x05, drop		; if not interest
+ldb	[x + 1]			;Load first length byte
+
+jlt	#253, length_len1	; < 253
+jeq	#253, length_len2
+jeq	#254, length_len3
+jeq	#255, length_len4
+
+length_len1:
+st	M[0]			; Store length in M[0]
+txa
+add	#2
+tax
+jmp	name_tlv
+
+length_len2:
+ldh	[x + 2]			; //load next 2 bytes
+st	M[0]			
+txa	
+add	#4
+tax
+jmp	name_tlv
+
+length_len3:
+ld	[x + 2]
+st	M[0]
+txa
+add	#6
+tax
+jmp	name_tlv
+
+length_len4:
+ld	[x + 2]
+st 	M[0]
+ld	[x + 4]
+st	M[1]
+txa	
+add	#10
+txa
+jmp	name_tlv
+
+name_tlv:
+ldb	[x + 0]			; Load the next TLV type
+jne	#0x07, drop		; We expect a name TLV
+
+ldb     [x + 1]                 ;Load first length byte
+jlt     #253, length_name1        ; < 253
+jeq     #253, length_name2
+jeq     #254, length_name3
+jeq     #255, length_name4
+
+length_name1:
+st      M[0]                    ; Store lenth in M[0]
+txa
+add	#2
+tax                   ; advance to next TLV start
+jmp     match_content
+
+length_name2:
+ldh     [x + 2]                 ; //load next 2 bytes
+st      M[0]    
+txa
+add	#4
+tax
+jmp     match_content
+
+length_name3:
+ld      [x + 2]
+st      M[0]
+txa
+add	#6
+tax
+jmp     match_content
+
+length_name4:
+ld      [x + 2]
+st      M[0]
+ld      [x + 4]
+st      M[1]
+txa
+add	#10
+tax
+jmp     match_content
+
+match_content:			; The name components we can just compare
+
+
+ldb	[x + 2]			; For now match TNO :)
+jne	#0x74, drop
+ldb	[x + 3]
+jne	#0x6e, drop
+ldb	[x + 4]
+jne	#0x6f, drop
+
+
+jmp pass
+
+pass: 	ret #0xFFFF	; return -1
+drop:	ret #0x0000	; return 0
+
