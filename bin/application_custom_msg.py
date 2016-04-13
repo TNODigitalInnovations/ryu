@@ -19,7 +19,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
-from ryu.lib.type_desc import BPFProgram
+from ryu.lib.type_desc import BPFProgram, BPFMatch, ExecBpf
 from struct import *
 import os
 
@@ -76,8 +76,9 @@ class AnyMatchSwitch(app_manager.RyuApp):
         self.send_bpf_program(datapath, 0, bpf_inport1)
 
 
-
-	exp_match = parser.OFPMatch( exec_bpf = 0 )
+        bpfOfpmatch = BPFMatch(0,1,0xFFFFFFFFFFFFFFFF)
+        
+	exp_match = parser.OFPMatch( exec_bpf = bpfOfpmatch)
 	port_match = parser.OFPMatch(in_port = 1)
 
         print 'Inserting new flows'

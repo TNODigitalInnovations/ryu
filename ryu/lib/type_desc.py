@@ -65,6 +65,16 @@ class IPv6Addr(TypeDescr):
     to_user = addrconv.ipv6.bin_to_text
     from_user = addrconv.ipv6.text_to_bin
 
+class BPFMatch(object):
+    def __init__(self, prog_num, prog_res, prog_mask):
+        self.prog_num = prog_num
+        self.prog_res = prog_res
+        self.prog_mask = prog_mask
+
+    def __repr__(self):
+        return "prognum:" + hex(self.prog_num) + ", prog_res:" + hex(self.prog_res) + ", prog_mask:" + hex(self.prog_mask)
+
+
 class BPFProgram(object):
     def __init__(self, instructions):
         self.instructions = instructions
@@ -82,10 +92,23 @@ class Filter(TypeDescr):
 
     @staticmethod
     def from_user(i):
-        bin = ''.join([ struct.pack('HBBI', *v) for v in i.instructions ])
+        bin = ''.join([struct.pack('HBBI', *v) for v in i.instructions])
         padding = chr(0) * (Filter.size-len(bin))
         return bin + padding
 
+
+class ExecBpf(TypeDescr):
+    size = 20
+
+    @staticmethod
+    def to_user(bin):
+        vals = struct.unpack('!IQQ', bin)
+        return BPFMatch(vals[0],vals[1],vals[2])
+    
+    @staticmethod
+    def from_user(i):
+        bin = struct.pack('!IQQ',i.prog_num, i.prog_res, i.prog_mask)
+        return bin
 
 class UnknownType(TypeDescr):
     import base64

@@ -1190,7 +1190,7 @@ oxm_types = [
     oxm_fields.NiciraExtended1('tun_ipv4_src', 31, type_desc.IPv4Addr),
     oxm_fields.NiciraExtended1('tun_ipv4_dst', 32, type_desc.IPv4Addr),
     oxm_fields.OpenFlowBasic('any_match', 40, type_desc.Filter),
-    oxm_fields.OpenFlowBasic('exec_bpf', 41, type_desc.Int4),
+    oxm_fields.OpenFlowBasic('exec_bpf', 41, type_desc.ExecBpf),
 
 
     # The following definition is merely for testing 64-bit experimenter OXMs.
