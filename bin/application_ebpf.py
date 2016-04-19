@@ -44,40 +44,15 @@ class AnyMatchSwitch(app_manager.RyuApp):
         print 'Clearing the flow table'
         datapath.send_msg(self.remove_table_flows(datapath, 0, parser.OFPMatch(), []))
 
-        bpf_match_inport2 = parser.OFPMatch(any_match = BPFProgram((
-            ( 0x28, 0, 0, 0x00000000 ),
-            ( 0x15, 0, 3, 0x00000200 ), # in_port: 2
-            ( 0x28, 0, 0, 0x00000010 ),
-            ( 0x15, 0, 1, 0x00000800 ),
-            ( 0x6,  0, 0, 0x0000ffff ),
-            ( 0x6,  0, 0, 0x00000000 ),
-        )))
 
-        bpf_match_inport1 = parser.OFPMatch(any_match = BPFProgram((
-            ( 0x28, 0, 0, 0x00000000 ),
-            ( 0x15, 0, 3, 0x00000100 ), # in_port: 1
-            ( 0x28, 0, 0, 0x00000010 ),
-            ( 0x15, 0, 1, 0x00000800 ),
-            ( 0x6,  0, 0, 0x0000ffff ),
-            ( 0x6,  0, 0, 0x00000000 ),
-        )))
+	f = open('deadbeef.o','r')
+	
 
-	bpf_inport1 = BPFProgram((
-            ( 0x28, 0, 0, 0x00000000 ),
-            ( 0x15, 0, 3, 0x00000100 ), # in_port: 1
-            ( 0x28, 0, 0, 0x00000010 ),
-            ( 0x15, 0, 1, 0x00000800 ),
-            ( 0x6,  0, 0, 0x0000ffff ),
-            ( 0x6,  0, 0, 0x00000000 ),
-        ))
+        self.send_bpf_program(datapath, 0, f.read())
 
 
 
-        self.send_bpf_program(datapath, 0, bpf_inport1)
-
-
-
-        bpfOfpmatch = BPFMatch(0,1,0xFFFFFFFFFFFFFFFF,"broodje aap")
+        bpfOfpmatch = BPFMatch(0,0xDEADBEEF,0x00000000FFFFFFFF,"broodje aap")
         
 	exp_match = parser.OFPMatch( exec_bpf = bpfOfpmatch)
 	port_match = parser.OFPMatch(in_port = 1)
@@ -121,13 +96,12 @@ class AnyMatchSwitch(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        #Join each individual BPF instruction
-	bin_bpf_prog= ''.join( [ pack('HBBI', *v) for v in bpf_prog.instructions ]) 
-        prog_len = len(bin_bpf_prog)
+        prog_len = len(bpf_prog)
+	
+	print "prog len: " + str(prog_len) + "\n"
+	print bpf_prog.encode("hex")
 
-	print bin_bpf_prog
-
-        payload = pack("!II" + str(prog_len)  + "s",prog_num,prog_len,bin_bpf_prog) 
+        payload = pack("!II" + str(prog_len)  + "s",prog_num,prog_len,bpf_prog) 
 
 	print 'payload'
 	print payload

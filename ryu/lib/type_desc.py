@@ -66,13 +66,14 @@ class IPv6Addr(TypeDescr):
     from_user = addrconv.ipv6.text_to_bin
 
 class BPFMatch(object):
-    def __init__(self, prog_num, prog_res, prog_mask):
+    def __init__(self, prog_num, prog_res, prog_mask, param):
         self.prog_num = prog_num
         self.prog_res = prog_res
         self.prog_mask = prog_mask
+	self.param = param
 
     def __repr__(self):
-        return "prognum:" + hex(self.prog_num) + ", prog_res:" + hex(self.prog_res) + ", prog_mask:" + hex(self.prog_mask)
+        return "prognum:" + hex(self.prog_num) + ", prog_res:" + hex(self.prog_res) + ", prog_mask:" + hex(self.prog_mask) + ", parameter: " + self.param.encode("hex")
 
 
 class BPFProgram(object):
@@ -98,17 +99,20 @@ class Filter(TypeDescr):
 
 
 class ExecBpf(TypeDescr):
-    size = 20
+    size = 248
 
     @staticmethod
     def to_user(bin):
-        vals = struct.unpack('!IQQ', bin)
-        return BPFMatch(vals[0],vals[1],vals[2])
+        prognum, progres, progmask, paramlen = struct.unpack('!IQQB', bin[:21])
+        param, = struct.unpack("%ds" % paramlen, bin[21:21+paramlen])
+        return BPFMatch(prognum, progres, progmask, param)
     
     @staticmethod
     def from_user(i):
-        bin = struct.pack('!IQQ',i.prog_num, i.prog_res, i.prog_mask)
-        return bin
+        bin = struct.pack('!IQQB%ds' % len(i.param) ,i.prog_num, i.prog_res, i.prog_mask, len(i.param), i.param)
+	print 'Size: ' + str(len(bin))
+	padding = chr(0) * (Filter.size-len(bin))
+        return bin + padding
 
 class UnknownType(TypeDescr):
     import base64
