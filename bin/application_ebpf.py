@@ -45,24 +45,27 @@ class AnyMatchSwitch(app_manager.RyuApp):
         datapath.send_msg(self.remove_table_flows(datapath, 0, parser.OFPMatch(), []))
 
 
-	f = open('match_param.o','r')
+	#f = open('match_param.o','r')
+	f = open('match_param_icn.o','r')
 	
 
         self.send_bpf_program(datapath, 0, f.read())
 
 
 
-        bpfOfpmatch = BPFMatch(0,0xDEADBEEF,0x00000000FFFFFFFF,"broodje aap")
+        #bpfOfpmatch = BPFMatch(0,0xDEADBEEF,0x00000000FFFFFFFF,"broodje aap")
+        bpfOfpmatch = BPFMatch(0,0xFFFFFFFFFFFFFFFF,0xFFFFFFFFFFFFFFFF,"tno")
         
 	exp_match = parser.OFPMatch( exec_bpf = bpfOfpmatch)
-	port_match = parser.OFPMatch(in_port = 1)
+	port_match = parser.OFPMatch(in_port = 2)
 
         print 'Inserting new flows'
 
 
 
-#        self.add_flow(datapath, 0, port_match, [datapath.ofproto_parser.OFPActionOutput(1)])
-        self.add_flow(datapath, 1, exp_match, [datapath.ofproto_parser.OFPActionOutput(1)])
+        self.add_flow(datapath, 0, port_match, [datapath.ofproto_parser.OFPActionOutput(1)])
+        self.add_flow(datapath, 1, exp_match, [datapath.ofproto_parser.OFPActionOutput(2)])
+
 #        self.add_flow(datapath, 0, bpf_match_inport2, [datapath.ofproto_parser.OFPActionOutput(1)])
 #        self.add_flow(datapath, 1, bpf_match_inport1, [datapath.ofproto_parser.OFPActionOutput(2)])
 
