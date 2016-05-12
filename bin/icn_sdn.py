@@ -45,10 +45,13 @@ class IcnSdnApp(app_manager.RyuApp):
         datapath.send_msg(self.remove_table_flows(datapath, 0, parser.OFPMatch(), []))
 
 
-        print 'Transmitting bpf program'
+        print 'Transmitting interest bpf program'
         f = open('match_param_icn.o','r')
         self.send_bpf_program(datapath, 0, f.read())
 
+        print 'Transmitting data bpf program'
+        f = open('match_param_icn_data.o')
+        self.send_bpf_program(datapath, 1, f.read())
 
         print 'Inserting new flows'
 
@@ -80,9 +83,8 @@ class IcnSdnApp(app_manager.RyuApp):
         self.add_flow(datapath, 2, exp_match, actions)
 
 
-        # for the other site
-
-        bpfOfpmatch = BPFMatch(0,0xFFFFFFFFFFFFFFFF,0xFFFFFFFFFFFFFFFF,"tno-2")
+        # for the return path, match on data packets with program 1
+        bpfOfpmatch = BPFMatch(1,0xFFFFFFFFFFFFFFFF,0xFFFFFFFFFFFFFFFF,"tno-1")
         exp_match = parser.OFPMatch(in_port=1,eth_type=0x0800,exec_bpf = bpfOfpmatch)
 
         actions = []
