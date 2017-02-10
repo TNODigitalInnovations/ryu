@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+* fixed demo
+* icn_sdn interest demo app
+* example app 1
+* added bpf param example and header file
+* updated to new msg format: prognum, progresult, progmask, progparam
+* Updated to the new match field format
 * Added example to match on NDN
 * Extension of RYU from the original work of czivar to support longer BPF programs Sending a BPF program in the match structure limits bpf programs to 248 bytes (which was insufficient for our application)
 * adding BPFProgram
