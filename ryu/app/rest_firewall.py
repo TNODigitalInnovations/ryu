@@ -388,7 +388,7 @@ class FirewallController(ControllerBase):
         dpid_str = dpid_lib.dpid_to_str(dp.id)
         try:
             f_ofs = Firewall(dp)
-        except OFPUnknownVersion, message:
+        except OFPUnknownVersion as message:
             FirewallController._LOGGER.info('dpid=%s: %s',
                                             dpid_str, message)
             return
@@ -439,7 +439,7 @@ class FirewallController(ControllerBase):
     def _access_module(self, switchid, func, waiters=None):
         try:
             dps = self._OFS_LIST.get_ofs(switchid)
-        except ValueError, message:
+        except ValueError as message:
             return Response(status=400, body=str(message))
 
         msgs = []
@@ -479,7 +479,7 @@ class FirewallController(ControllerBase):
         try:
             dps = self._OFS_LIST.get_ofs(switchid)
             vid = FirewallController._conv_toint_vlanid(vlan_id)
-        except ValueError, message:
+        except ValueError as message:
             return Response(status=400, body=str(message))
 
         msgs = []
@@ -500,7 +500,7 @@ class FirewallController(ControllerBase):
         try:
             dps = self._OFS_LIST.get_ofs(switchid)
             vid = FirewallController._conv_toint_vlanid(vlan_id)
-        except ValueError, message:
+        except ValueError as message:
             return Response(status=400, body=str(message))
 
         msgs = []
@@ -508,7 +508,7 @@ class FirewallController(ControllerBase):
             try:
                 msg = f_ofs.set_rule(rule, self.waiters, vid)
                 msgs.append(msg)
-            except ValueError, message:
+            except ValueError as message:
                 return Response(status=400, body=str(message))
 
         body = json.dumps(msgs)
@@ -524,7 +524,7 @@ class FirewallController(ControllerBase):
         try:
             dps = self._OFS_LIST.get_ofs(switchid)
             vid = FirewallController._conv_toint_vlanid(vlan_id)
-        except ValueError, message:
+        except ValueError as message:
             return Response(status=400, body=str(message))
 
         msgs = []
@@ -532,7 +532,7 @@ class FirewallController(ControllerBase):
             try:
                 msg = f_ofs.delete_rule(ruleid, self.waiters, vid)
                 msgs.append(msg)
-            except ValueError, message:
+            except ValueError as message:
                 return Response(status=400, body=str(message))
 
         body = json.dumps(msgs)
@@ -897,6 +897,19 @@ class Match(object):
                  REST_NW_PROTO_ICMP: inet.IPPROTO_ICMP,
                  REST_NW_PROTO_ICMPV6: inet.IPPROTO_ICMPV6}}
 
+    _MATCHES = [REST_IN_PORT,
+                REST_SRC_MAC,
+                REST_DST_MAC,
+                REST_DL_TYPE,
+                REST_DL_VLAN,
+                REST_SRC_IP,
+                REST_DST_IP,
+                REST_SRC_IPV6,
+                REST_DST_IPV6,
+                REST_NW_PROTO,
+                REST_TP_SRC,
+                REST_TP_DST]
+
     @staticmethod
     def to_openflow(rest):
 
@@ -1002,7 +1015,7 @@ class Match(object):
                     match.setdefault(key, Match._CONVERT[key][value])
                 else:
                     raise ValueError('Invalid rule parameter. : key=%s' % key)
-            else:
+            elif key in Match._MATCHES:
                 match.setdefault(key, value)
 
         return match

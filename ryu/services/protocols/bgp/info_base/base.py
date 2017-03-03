@@ -123,14 +123,14 @@ class Table(object):
         Old paths have source version number that is less than current peer
         version number. Also removes sent paths to this peer.
         """
-        LOG.debug('Cleaning paths from table %s for peer %s' % (self, peer))
+        LOG.debug('Cleaning paths from table %s for peer %s', self, peer)
         for dest in self.itervalues():
             # Remove paths learned from this source
             paths_deleted = dest.remove_old_paths_from_source(peer)
             # Remove sent paths to this peer
             had_sent = dest.remove_sent_route(peer)
             if had_sent:
-                LOG.debug('Removed sent route %s for %s' % (dest.nlri, peer))
+                LOG.debug('Removed sent route %s for %s', dest.nlri, peer)
             # If any paths are removed we enqueue respective destination for
             # future processing.
             if paths_deleted:
@@ -143,8 +143,8 @@ class Table(object):
              - `interested_rts`: (set) of RT that are of interest/that need to
              be preserved
         """
-        LOG.debug('Cleaning table %s for given interested RTs %s' %
-                  (self, interested_rts))
+        LOG.debug('Cleaning table %s for given interested RTs %s',
+                  self, interested_rts)
         uninteresting_dest_count = 0
         for dest in self.itervalues():
             added_withdraw = \
@@ -233,8 +233,8 @@ class NonVrfPathProcessingMixin(object):
                 withdraw_clone = sent_path.clone(for_withdrawal=True)
                 outgoing_route = OutgoingRoute(withdraw_clone)
                 sent_route.sent_peer.enque_outgoing_msg(outgoing_route)
-                LOG.debug('Sending withdrawal to %s for %s' %
-                          (sent_route.sent_peer, outgoing_route))
+                LOG.debug('Sending withdrawal to %s for %s',
+                          sent_route.sent_peer, outgoing_route)
 
             # Have to clear sent_route list for this destination as
             # best path is removed.
@@ -243,7 +243,7 @@ class NonVrfPathProcessingMixin(object):
     def _new_best_path(self, new_best_path):
         old_best_path = self._best_path
         self._best_path = new_best_path
-        LOG.debug('New best path selected for destination %s' % (self))
+        LOG.debug('New best path selected for destination %s', self)
 
         # If old best path was withdrawn
         if (old_best_path and old_best_path not in self._known_path_list
@@ -264,8 +264,8 @@ class NonVrfPathProcessingMixin(object):
                 withdraw_clone = sent_path.clone(for_withdrawal=True)
                 outgoing_route = OutgoingRoute(withdraw_clone)
                 sent_route.sent_peer.enque_outgoing_msg(outgoing_route)
-                LOG.debug('Sending withdrawal to %s for %s' %
-                          (sent_route.sent_peer, outgoing_route))
+                LOG.debug('Sending withdrawal to %s for %s',
+                          sent_route.sent_peer, outgoing_route)
                 self._sent_routes = {}
 
 
@@ -509,7 +509,7 @@ class Destination(object):
         stopped by the same policies.
         """
 
-        LOG.debug('Removing %s withdrawals' % len(self._withdraw_list))
+        LOG.debug('Removing %s withdrawals', len(self._withdraw_list))
 
         # If we have no withdrawals, we have nothing to do.
         if not self._withdraw_list:
@@ -519,7 +519,7 @@ class Destination(object):
         # delete these withdraws.
         if not self._known_path_list:
             LOG.debug('Found %s withdrawals for path(s) that did not get'
-                      ' installed.' % len(self._withdraw_list))
+                      ' installed.', len(self._withdraw_list))
             del(self._withdraw_list[:])
             return
 
@@ -541,13 +541,13 @@ class Destination(object):
             # We do no have any match for this withdraw.
             if not match:
                 LOG.debug('No matching path for withdraw found, may be path '
-                          'was not installed into table: %s' %
+                          'was not installed into table: %s',
                           withdraw)
         # If we have partial match.
         if len(matches) != len(self._withdraw_list):
             LOG.debug('Did not find match for some withdrawals. Number of '
-                      'matches(%s), number of withdrawals (%s)' %
-                      (len(matches), len(self._withdraw_list)))
+                      'matches(%s), number of withdrawals (%s)',
+                      len(matches), len(self._withdraw_list))
 
         # Clear matching paths and withdrawals.
         for match in matches:
@@ -577,7 +577,7 @@ class Destination(object):
             for old_path in old_paths:
                 known_paths.remove(old_path)
                 LOG.debug('Implicit withdrawal of old path, since we have'
-                          ' learned new path from same source: %s' % old_path)
+                          ' learned new path from same source: %s', old_path)
 
     def _compute_best_known_path(self):
         """Computes the best path among known paths.

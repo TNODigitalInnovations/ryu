@@ -14,8 +14,6 @@
 # limitations under the License.
 
 import base64
-import struct
-import socket
 import logging
 import netaddr
 
@@ -24,7 +22,6 @@ from ryu.ofproto import inet
 from ryu.ofproto import ofproto_v1_3
 from ryu.ofproto import ofproto_v1_3_parser
 from ryu.lib import hub
-from ryu.lib import mac
 
 
 LOG = logging.getLogger('ryu.lib.ofctl_v1_3')
@@ -125,7 +122,7 @@ def to_actions(dp, acts):
                 meter_id = int(a.get('meter_id'))
                 inst.append(parser.OFPInstructionMeter(meter_id))
             else:
-                LOG.error('Unknown action type: %s' % action_type)
+                LOG.error('Unknown action type: %s', action_type)
 
     inst.append(parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS,
                                              actions))
@@ -208,7 +205,7 @@ def actions_to_str(instructions):
 def to_match(dp, attrs):
     convert = {'in_port': int,
                'in_phy_port': int,
-               'metadata': to_match_metadata,
+               'metadata': to_match_masked_int,
                'dl_dst': to_match_eth,
                'dl_src': to_match_eth,
                'eth_dst': to_match_eth,
@@ -254,7 +251,7 @@ def to_match(dp, attrs):
                'mpls_bos': int,
                'pbb_isid': int,
                'tunnel_id': int,
-               'ipv6_exthdr': int}
+               'ipv6_exthdr': to_match_masked_int}
 
     keys = {'dl_dst': 'eth_dst',
             'dl_src': 'eth_src',
@@ -275,23 +272,25 @@ def to_match(dp, attrs):
 
     kwargs = {}
     for key, value in attrs.items():
-        if key in convert:
-            value = convert[key](value)
         if key in keys:
             # For old field name
             key = keys[key]
-        if key == 'tp_src' or key == 'tp_dst':
-            # TCP/UDP port
-            conv = {inet.IPPROTO_TCP: {'tp_src': 'tcp_src',
-                                       'tp_dst': 'tcp_dst'},
-                    inet.IPPROTO_UDP: {'tp_src': 'udp_src',
-                                       'tp_dst': 'udp_dst'}}
-            ip_proto = attrs.get('nw_proto', attrs.get('ip_proto', 0))
-            key = conv[ip_proto][key]
-            kwargs[key] = value
+        if key in convert:
+            value = convert[key](value)
+            if key == 'tp_src' or key == 'tp_dst':
+                # TCP/UDP port
+                conv = {inet.IPPROTO_TCP: {'tp_src': 'tcp_src',
+                                           'tp_dst': 'tcp_dst'},
+                        inet.IPPROTO_UDP: {'tp_src': 'udp_src',
+                                           'tp_dst': 'udp_dst'}}
+                ip_proto = attrs.get('nw_proto', attrs.get('ip_proto', 0))
+                key = conv[ip_proto][key]
+                kwargs[key] = value
+            else:
+                # others
+                kwargs[key] = value
         else:
-            # others
-            kwargs[key] = value
+            LOG.error('Unknown match field: %s', key)
 
     return dp.ofproto_parser.OFPMatch(**kwargs)
 
@@ -338,8 +337,8 @@ def to_match_vid(value):
                 return int(value, 0)
 
 
-def to_match_metadata(value):
-    if '/' in value:
+def to_match_masked_int(value):
+    if isinstance(value, str) and '/' in value:
         value = value.split('/')
         return str_to_int(value[0]), str_to_int(value[1])
     else:
@@ -374,8 +373,8 @@ def match_to_str(ofmatch):
         value = match_field['OXMTlv']['value']
         if key == 'dl_vlan':
             value = match_vid_to_str(value, mask)
-        elif key == 'metadata':
-            value = match_metadata_to_str(value, mask)
+        elif key == 'metadata' or key == 'ipv6_exthdr':
+            value = match_masked_int_to_str(value, mask)
         else:
             if mask is not None:
                 value = value + '/' + mask
@@ -386,8 +385,8 @@ def match_to_str(ofmatch):
     return match
 
 
-def match_metadata_to_str(value, mask):
-    return ('%d/%d' % (value, mask) if mask else '%d' % value)
+def match_masked_int_to_str(value, mask):
+    return '%d/%d' % (value, mask) if mask else '%d' % value
 
 
 def match_vid_to_str(value, mask):

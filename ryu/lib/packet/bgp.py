@@ -29,6 +29,13 @@ import copy
 import netaddr
 import numbers
 
+try:
+    # Python 3
+    from functools import reduce
+except ImportError:
+    # Python 2
+    pass
+
 from ryu.lib.stringify import StringifyMixin
 from ryu.lib.packet import afi as addr_family
 from ryu.lib.packet import safi as subaddr_family
@@ -276,7 +283,7 @@ class BadMsg(BgpExc):
         self.data = struct.pack('B', msg_type)
 
     def __str__(self):
-        return '<BadMsg %d>' % (self.msg,)
+        return '<BadMsg %d>' % (self.msg_type,)
 
 # ============================================================================
 # OPEN Message Errors
@@ -1490,7 +1497,7 @@ class _BGPPathAttributeAsPathCommon(_PathAttribute):
                                                  buffer(buf))
             buf = buf[struct.calcsize(cls._SEG_HDR_PACK_STR):]
             l = []
-            for i in xrange(0, num_as):
+            for i in range(0, num_as):
                 (as_number,) = struct.unpack_from(as_pack_str,
                                                   buffer(buf))
                 buf = buf[struct.calcsize(as_pack_str):]

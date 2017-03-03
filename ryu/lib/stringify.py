@@ -37,7 +37,13 @@ import inspect
 # grep __init__ *.py | grep '[^_]_\>' showed that
 # 'len', 'property', 'set', 'type'
 # A bit more generic way is adopted
-import __builtin__
+try:
+    # Python 2
+    import __builtin__
+except ImportError:
+    # Python 3
+    import builtins as __builtin__
+
 _RESERVED_KEYWORD = dir(__builtin__)
 
 
@@ -303,9 +309,9 @@ class StringifyMixin(object):
             return cls(**dict(kwargs, **additional_args))
         except TypeError:
             # debug
-            print "CLS", cls
-            print "ARG", dict_
-            print "KWARG", kwargs
+            print("CLS %s" % cls)
+            print("ARG %s" % dict_)
+            print("KWARG %s" % kwargs)
             raise
 
     @classmethod

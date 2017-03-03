@@ -28,6 +28,7 @@ import itertools
 import logging
 import sys
 import os
+import gc
 
 from ryu import cfg
 from ryu import utils
@@ -284,12 +285,12 @@ class RyuApp(object):
         if name in SERVICE_BRICKS:
             if isinstance(ev, EventRequestBase):
                 ev.src = self.name
-            LOG.debug("EVENT %s->%s %s" %
-                      (self.name, name, ev.__class__.__name__))
+            LOG.debug("EVENT %s->%s %s",
+                      self.name, name, ev.__class__.__name__)
             SERVICE_BRICKS[name]._send_event(ev, state)
         else:
-            LOG.debug("EVENT LOST %s->%s %s" %
-                      (self.name, name, ev.__class__.__name__))
+            LOG.debug("EVENT LOST %s->%s %s",
+                      self.name, name, ev.__class__.__name__)
 
     def send_event_to_observers(self, ev, state=None):
         """
@@ -344,6 +345,10 @@ class AppManager(object):
             hub.joinall(services)
         finally:
             app_mgr.close()
+            for t in services:
+                t.kill()
+            hub.joinall(services)
+            gc.collect()
 
     @staticmethod
     def get_instance():
@@ -440,11 +445,11 @@ class AppManager(object):
 
     @staticmethod
     def _report_brick(name, app):
-        LOG.debug("BRICK %s" % name)
+        LOG.debug("BRICK %s", name)
         for ev_cls, list_ in app.observers.items():
-            LOG.debug("  PROVIDES %s TO %s" % (ev_cls.__name__, list_))
+            LOG.debug("  PROVIDES %s TO %s", ev_cls.__name__, list_)
         for ev_cls in app.event_handlers.keys():
-            LOG.debug("  CONSUMES %s" % (ev_cls.__name__,))
+            LOG.debug("  CONSUMES %s", ev_cls.__name__)
 
     @staticmethod
     def report_bricks():
@@ -511,5 +516,7 @@ class AppManager(object):
                 self._close(app)
             close_dict.clear()
 
-        close_all(self.applications)
+        for app_name in list(self.applications.keys()):
+            self.uninstantiate(app_name)
+        assert not self.applications
         close_all(self.contexts)
