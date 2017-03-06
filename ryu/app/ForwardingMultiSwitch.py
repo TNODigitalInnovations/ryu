@@ -258,10 +258,6 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
             flood()
             LOG.warn("\tFlooded unicast packet, unknown MAC address location")
         
-        #ARP messages are too infrequent and volatile of nature to create flows for, output immediately
-        elif eth.ethertype == ether_types.ETH_TYPE_ARP:
-            output(self.mac_learning[eth.dst].dpid, self.mac_learning[eth.dst].port)
-            LOG.warn("\tProcessed packet, send to recipient at %s"%(self.mac_learning[eth.dst],))
         #Create flow and output or forward.
         else:
 
