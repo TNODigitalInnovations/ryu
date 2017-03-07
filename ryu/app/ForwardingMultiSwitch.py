@@ -235,6 +235,9 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
             # ignore LLDP related messages IF topology module has been enabled.
             LOG.debug("\tIgnored LLDP packet due to enabled topology module")
             return
+	if eth.dst == "01:00:5e:00:17:aa":
+		LOG.debug("\tIgnored NDN packet")
+		return
 
         LOG.warn("ForwardingMultiSwitch: Accepted incoming packet from %s at switch %d, port %d, for reason %s"%(eth.src,dpid,in_port,reason))                
         LOG.debug("\t%s"%(msg))        
