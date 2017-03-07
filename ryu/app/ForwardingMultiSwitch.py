@@ -18,11 +18,10 @@ import logging
 from ryu.base import app_manager
 from ryu.controller import handler
 
-from ryu.topology import event
-from ryu.topology import switches
+from ryu.topology import event as switch_event
 
 from ryu.ofproto import ofproto_v1_3
-from ryu.controller import ofp_event
+from ryu.controller import ofp_event, event
 
 from collections import defaultdict
 from collections import namedtuple
@@ -41,12 +40,28 @@ from ryu.lib import ovs
 
 LOG = logging.getLogger(__name__)
 
+class EventMacLookupRequest(event.EventRequestBase):
+	def __init__(self, mac):
+		super(EventMacLookupRequest, self).__init__()
+		self.dst = 'ForwardingMultiSwitch'
+		self.mac = mac
+
+	def __str__(self):
+		return 'EventMacLookupRequest<src=%s, mac=%s>' % (self.src, self.mac)
+
+class EventMacLookupReply(event.EventReplyBase):
+	def __init__(self, dst, switch_port):
+		super(EventMacLookupReply, self).__init__(dst)
+		self.switch_port = switch_port
+
+	def __str__(self):
+		return 'EventMacLookupReply<dst=%s, switch_port=%s>' % (self.dst, self.switch_port)
+
+def mac_lookup(app, mac):
+	rep = app.send_request(EventMacLookupRequest(mac))
+	return rep.switch_port
+
 class ForwardingMultiSwitch(app_manager.RyuApp):
-    ''' This app dumps discovery events
-    '''
-    _CONTEXTS = {
-        'switches': switches.Switches,
-    }
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
     def __init__(self, *args, **kwargs):
@@ -60,19 +75,6 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
         self.prev = defaultdict(lambda:defaultdict(lambda:None))
         self.fw = defaultdict(lambda:defaultdict(lambda:None))
         self.dpids = lambda:[dpid for dpid in sorted( self.switches.keys() )]
-
-        # For testing when sync and async request.
-#        self.threads.append(
-#            hub.spawn(self._switch_request_sync, 5))
-#        self.threads.append(
-#            hub.spawn(self._switch_request_async, 10))
-#
-#        self.threads.append(
-#            hub.spawn(self._link_request_sync, 5))
-#        self.threads.append(
-#            hub.spawn(self._link_request_async, 10))
-
-#        self.is_active = True
 
     @handler.set_ev_cls(ofp_event.EventOFPStateChange,  [CONFIG_DISPATCHER])
     def state_change_handler(self, ev):
@@ -89,7 +91,7 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
         barrier_req = parser.OFPBarrierRequest(dp)
         dp.send_msg(barrier_req)
 
-    @handler.set_ev_cls(event.EventSwitchEnter)
+    @handler.set_ev_cls(switch_event.EventSwitchEnter)
     def switch_enter_handler(self, ev):
         
         LOG.warn("ForwardingMultiSwitch: "+ str(ev))
@@ -114,24 +116,24 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
         self.fw  [dpid][dpid] = (dpid, 0)
         self._print_fw_matrix()
 
-    @handler.set_ev_cls(event.EventSwitchLeave)
+    @handler.set_ev_cls(switch_event.EventSwitchLeave)
     def switch_leave_handler(self, ev):
         LOG.warn("ForwardingMultiSwitch: "+ str(ev))
         LOG.error("ForwardingMultiSwitch: To Do, fix what to do upon leaving of a switch")
 
-#    @handler.set_ev_cls(event.EventPortAdd)
+#    @handler.set_ev_cls(switch_event.EventPortAdd)
 #    def port_add_handler(self, ev):
 #        LOG.debug("ForwardingMultiSwitch: "+ str(ev))
 #
-#    @handler.set_ev_cls(event.EventPortDelete)
+#    @handler.set_ev_cls(switch_event.EventPortDelete)
 #    def port_delete_handler(self, ev):
 #        LOG.debug("ForwardingMultiSwitch: "+ str(ev))
 #
-#    @handler.set_ev_cls(event.EventPortModify)
+#    @handler.set_ev_cls(switch_event.EventPortModify)
 #    def port_modify_handler(self, ev):
 #        LOG.debug("ForwardingMultiSwitch: "+ str(ev))
 
-    @handler.set_ev_cls(event.EventLinkAdd)
+    @handler.set_ev_cls(switch_event.EventLinkAdd)
     def link_add_handler(self, ev):
         LOG.warn("ForwardingMultiSwitch: "+ str(ev))
         link = ev.link
@@ -145,7 +147,7 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
         self._calc_ForwardingMatrix()
         self._print_fw_matrix()
 
-    @handler.set_ev_cls(event.EventLinkDelete)
+    @handler.set_ev_cls(switch_event.EventLinkDelete)
     def link_del_handler(self, ev):
         LOG.warn("ForwardingMultiSwitch: "+ str(ev))
         LOG.error("ForwardingMultiSwitch: To Do, fix what to do upon deletion of a link")
@@ -235,9 +237,6 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
             # ignore LLDP related messages IF topology module has been enabled.
             LOG.debug("\tIgnored LLDP packet due to enabled topology module")
             return
-	if eth.dst == "01:00:5e:00:17:aa":
-		LOG.debug("\tIgnored NDN packet")
-		return
 
         LOG.warn("ForwardingMultiSwitch: Accepted incoming packet from %s at switch %d, port %d, for reason %s"%(eth.src,dpid,in_port,reason))                
         LOG.debug("\t%s"%(msg))        
@@ -252,11 +251,14 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
         else:
             LOG.warn("\tIncoming packet from switch-to-switch link, this should NOT occur.")
             #DROP it
+	if eth.dst == "01:00:5e:00:17:aa":
+		LOG.debug("\tIgnored NDN packet")
 
-        if mac.is_multicast( mac.haddr_to_bin(eth.dst) ):
+        elif mac.is_multicast( mac.haddr_to_bin(eth.dst) ):
             self._install_tree(dpid, pkt, in_port)
             flood()
             LOG.warn("\tFlooded multicast packet")
+
         elif eth.dst not in self.mac_learning:
             flood()
             LOG.warn("\tFlooded unicast packet, unknown MAC address location")
@@ -464,6 +466,18 @@ class ForwardingMultiSwitch(app_manager.RyuApp):
 
         LOG.warn("\t\tDone.")
         return -2
+
+    @handler.set_ev_cls(EventMacLookupRequest)
+    def mac_lookup_handler(self, req):
+        mac = req.mac
+
+	if mac not in self.mac_learning:
+            switch_port = None
+        else:
+            switch_port = self.mac_learning[mac]
+
+        rep = EventMacLookupReply(req.src, switch_port)
+        self.reply_to_request(req, rep)
 
 app_manager.require_app('ryu.topology.switches', api_style=False)
 
